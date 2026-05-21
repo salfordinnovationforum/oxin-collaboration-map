@@ -2,17 +2,27 @@
 
 Interactive visualisation of business connections at Salford Innovation Forum (SIF), part of the OXIN network.
 
+**Live prototype:** https://salfordinnovationforum.github.io/oxin-collaboration-map/prototype/
+
 ## Contents
 
-- `prototype/` — Interactive HTML prototype (`index.html`)
-- `brief.md` — Project brief
-- `research-findings.md` — Research notes
-- `green-infrastructure-research.md` — Supporting research
-- `Interactive_Collaboration_Map_Brief.pdf` — Brief (PDF)
+- `prototype/` — Interactive HTML prototype (`index.html`) — deployed via GitHub Pages
+- `Interactive_Collaboration_Map_Brief.pdf` — Project brief
 
-## Running the prototype
+## Embedding
 
-Open `prototype/index.html` in a browser, or serve locally:
+```html
+<iframe
+  src="https://salfordinnovationforum.github.io/oxin-collaboration-map/prototype/"
+  width="100%"
+  height="800"
+  style="border: 0;"
+  loading="lazy"
+  title="SIF Collaboration Map">
+</iframe>
+```
+
+## Running locally
 
 ```bash
 cd prototype && python3 -m http.server 8000
