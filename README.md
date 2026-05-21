@@ -7,7 +7,6 @@ Interactive visualisation of business connections at Salford Innovation Forum (S
 ## Contents
 
 - `prototype/` — Interactive HTML prototype (`index.html`) — deployed via GitHub Pages
-- `Interactive_Collaboration_Map_Brief.pdf` — Project brief
 
 ## Embedding
 
