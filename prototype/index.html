@@ -1,0 +1,2941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salford Innovation Forum — Salford Collaboration Map</title>
+<meta property="og:title" content="Salford Collaboration Map — Salford Innovation Forum">
+<meta property="og:description" content="Explore the innovation ecosystem at the heart of Greater Manchester">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  @font-face { font-family: 'Telegraf'; src: url('PPTelegraf-Regular.otf') format('opentype'); font-weight: 400; }
+  @font-face { font-family: 'Telegraf'; src: url('PPTelegraf-UltraBold.otf') format('opentype'); font-weight: 800; }
+  @font-face { font-family: 'Telegraf'; src: url('PPTelegraf-UltraLight.otf') format('opentype'); font-weight: 200; }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Telegraf', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0a0e1a;
+    color: #e0e6f0;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #map {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  /* Override maplibre defaults */
+  .maplibregl-ctrl-attrib { display: none !important; }
+  .maplibregl-ctrl-logo { display: none !important; }
+
+  /* Header bar — solid, no gradient */
+  .header-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 12px 24px;
+    background: #0a0e1a;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .header-overlay > * { pointer-events: auto; }
+  .header-logo svg {
+    height: 36px;
+    width: auto;
+    display: block;
+  }
+  .header-text { display: flex; flex-direction: column; }
+  .header-title {
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #00e5cc;
+    text-transform: uppercase;
+  }
+  .header-subtitle {
+    font-size: 12px;
+    font-weight: 200;
+    color: rgba(255,255,255,0.45);
+    margin-top: 1px;
+    letter-spacing: 0.2px;
+  }
+
+  /* Stats bar — solid, no gradient */
+  .stats-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 12px 24px;
+    background: #0a0e1a;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    gap: 28px;
+    align-items: center;
+    pointer-events: none;
+  }
+  .stat { display: flex; align-items: baseline; gap: 5px; }
+  .stat-value { font-size: 18px; font-weight: 800; color: #00e5cc; }
+  .stat-label { font-size: 10px; font-weight: 400; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 1.2px; }
+
+  /* Filter panel — solid, sharp */
+  .filter-panel {
+    position: fixed;
+    top: 62px;
+    right: 0;
+    z-index: 100;
+    background: #0a0e1a;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    padding: 16px;
+    min-width: 210px;
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+  }
+  .filter-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 10px;
+  }
+  .filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    color: #e0e6f0;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    width: 100%;
+    text-align: left;
+    transition: background 0.2s, opacity 0.2s;
+  }
+  .filter-btn:hover { background: rgba(255,255,255,0.05); }
+  .filter-btn.inactive { opacity: 0.3; }
+  .filter-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .filter-count {
+    margin-left: auto;
+    font-size: 10px;
+    color: rgba(255,255,255,0.3);
+  }
+
+  .layer-section { margin-bottom: 14px; }
+  .layer-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 10px 0;
+  }
+  .toggle-all-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .toggle-all-btn {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: transparent;
+    color: rgba(255,255,255,0.4);
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 400;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background 0.15s, color 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .toggle-all-btn:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.7); }
+  .filter-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 9px 12px;
+    background: transparent;
+    border: 1px solid rgba(0,229,204,0.25);
+    border-radius: 0;
+    color: #00e5cc;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 400;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .filter-cta:hover { background: rgba(0,229,204,0.08); border-color: rgba(0,229,204,0.5); }
+  .filter-cta svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  /* Search — solid, sharp */
+  .search-box {
+    position: fixed;
+    top: 74px;
+    left: 16px;
+    z-index: 100;
+  }
+  .search-input {
+    background: #0a0e1a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0;
+    padding: 10px 14px 10px 36px;
+    color: #e0e6f0;
+    font-family: inherit;
+    font-size: 12px;
+    width: 220px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: #00e5cc; }
+  .search-input::placeholder { color: rgba(255,255,255,0.25); }
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255,255,255,0.3);
+    font-size: 14px;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* Search dropdown */
+  .search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 0;
+    background: #0a0e1a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0;
+    overflow: hidden;
+    display: none;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .search-dropdown.visible { display: block; }
+  .search-result {
+    padding: 8px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #e0e6f0;
+    transition: background 0.15s;
+  }
+  .search-result:hover { background: rgba(78,205,196,0.08); }
+  .search-result-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .search-result-sector {
+    font-size: 10px;
+    color: rgba(255,255,255,0.3);
+    margin-left: auto;
+  }
+  .search-no-results {
+    padding: 14px;
+    text-align: center;
+  }
+  .search-no-results-text {
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 10px;
+  }
+  .search-cta {
+    display: inline-block;
+    padding: 8px 18px;
+    background: #00e5cc;
+    color: #0a0e1a;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    border: none;
+    border-radius: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    text-decoration: none;
+    letter-spacing: 0.3px;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .search-cta:hover { background: #3dbdb5; transform: translateY(-1px); }
+
+  /* CTA button stack */
+  .cta-stack {
+    position: fixed;
+    bottom: 60px;
+    left: 30px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cta-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+  }
+  .cta-btn { border-radius: 0; }
+  .cta-btn:hover { transform: translateY(-2px); }
+  .cta-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .cta-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid rgba(78,205,196,0.4);
+  }
+  .cta-primary .cta-avatar { border-color: rgba(255,255,255,0.3); }
+  .cta-secondary .cta-avatar { border-color: rgba(0,229,204,0.4); }
+
+  .cta-primary {
+    background: #00e5cc;
+    color: #0a0e1a;
+    border: none;
+    border-radius: 0;
+  }
+  .cta-primary:hover { background: #00ccb5; }
+
+  .cta-secondary {
+    background: transparent;
+    color: #00e5cc;
+    border: 1.5px solid rgba(0,229,204,0.4);
+    border-radius: 0;
+  }
+  .cta-secondary:hover { background: rgba(0,229,204,0.08); border-color: rgba(0,229,204,0.6); }
+
+  .cta-tertiary {
+    background: rgba(15,20,35,0.7);
+    color: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(12px);
+    font-weight: 500;
+    font-size: 12px;
+    padding: 8px 16px;
+  }
+  .cta-tertiary:hover { color: #fff; border-color: rgba(255,255,255,0.2); background: rgba(15,20,35,0.85); }
+
+  .search-dropdown::-webkit-scrollbar { width: 4px; }
+  .search-dropdown::-webkit-scrollbar-track { background: transparent; }
+  .search-dropdown::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+  /* Info card — solid, sharp */
+  .info-card {
+    position: fixed;
+    z-index: 200;
+    background: #0a0e1a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0;
+    padding: 20px;
+    width: 320px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+    display: none;
+    transition: opacity 0.2s;
+  }
+  .info-card.visible { display: block; }
+  .info-card-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.4);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .info-card-sector {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+  }
+  .info-card-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+    line-height: 1.2;
+    padding-right: 30px;
+  }
+  .info-card-type {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 12px;
+  }
+  .info-card-desc {
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.65);
+    margin-bottom: 14px;
+  }
+  .info-card-connections-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(78,205,196,0.7);
+    margin-bottom: 6px;
+  }
+  .info-card-connection {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    padding: 3px 0;
+  }
+  .info-card-connection::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #00e5cc;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  /* Legend */
+  .legend {
+    position: fixed;
+    bottom: 60px;
+    right: 20px;
+    z-index: 100;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .legend-line {
+    width: 20px;
+    height: 2px;
+  }
+  .legend-line.solid { background: rgba(78,205,196,0.5); }
+  .legend-line.dashed { background: repeating-linear-gradient(90deg, rgba(255,170,100,0.5) 0, rgba(255,170,100,0.5) 4px, transparent 4px, transparent 8px); }
+  .legend-line.dotted { background: repeating-linear-gradient(90deg, rgba(150,130,255,0.5) 0, rgba(150,130,255,0.5) 2px, transparent 2px, transparent 6px); }
+  .legend-line.green-dash { background: repeating-linear-gradient(90deg, rgba(74,222,128,0.5) 0, rgba(74,222,128,0.5) 5px, transparent 5px, transparent 8px); }
+
+
+  /* Scrollbar */
+  .filter-panel::-webkit-scrollbar { width: 4px; }
+  .filter-panel::-webkit-scrollbar-track { background: transparent; }
+  .filter-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+  /* Tour button — full width in filter panel, pink */
+  .tour-panel-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 11px 16px;
+    background: #f43f7a;
+    color: #0a0e1a;
+    border: none;
+    border-radius: 0;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .tour-panel-btn:hover { background: #e0336b; }
+  .tour-panel-btn svg { width: 14px; height: 14px; }
+  .tour-panel-btn.tour-stop {
+    background: rgba(239,68,68,0.15);
+    color: #f87171;
+    border: 1px solid rgba(239,68,68,0.3);
+  }
+  .tour-panel-btn.tour-stop:hover { background: rgba(239,68,68,0.25); }
+
+  /* Fullscreen — small corner button, bottom right */
+  .fullscreen-corner-btn {
+    position: fixed;
+    bottom: 50px;
+    right: 16px;
+    z-index: 100;
+    width: 32px;
+    height: 32px;
+    background: #0a0e1a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0;
+    color: rgba(255,255,255,0.35);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .fullscreen-corner-btn:hover { color: #fff; border-color: rgba(255,255,255,0.25); }
+
+  .tour-card {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 250;
+    background: #0a0e1a;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0;
+    padding: 24px 32px;
+    max-width: 520px;
+    width: calc(100% - 60px);
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+  }
+  .tour-card.visible { opacity: 1; pointer-events: auto; }
+  .tour-card-step {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #00e5cc;
+    margin-bottom: 8px;
+  }
+  .tour-card-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  .tour-card-desc {
+    font-size: 14px;
+    font-weight: 300;
+    color: rgba(255,255,255,0.55);
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+  .tour-card-stats {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 16px;
+  }
+  .tour-card-stat-val { font-size: 22px; font-weight: 700; color: #00e5cc; }
+  .tour-card-stat-lbl { font-size: 9px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 1px; }
+  .tour-nav {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+  .tour-nav-btn {
+    padding: 8px 20px;
+    border-radius: 0;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .tour-nav-next { background: #00e5cc; color: #0a0e1a; }
+  .tour-nav-next:hover { background: #00ccb5; }
+  .tour-nav-skip { background: transparent; color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.1); }
+  .tour-nav-skip:hover { color: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.2); }
+  .tour-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .tour-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    transition: background 0.3s;
+  }
+  .tour-dot.active { background: #00e5cc; }
+
+  /* Hover tooltip */
+  .hover-tooltip {
+    position: fixed;
+    z-index: 300;
+    background: #0a0e1a;
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 12px 14px;
+    pointer-events: none;
+    display: none;
+    width: 280px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+  }
+  .hover-tooltip.visible { display: block; pointer-events: auto; }
+  .hover-tooltip-header {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 9px;
+  }
+  .hover-tooltip-logo {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    color: #0a0e1a;
+    letter-spacing: 0.5px;
+  }
+  .hover-tooltip-meta { flex: 1; min-width: 0; }
+  .hover-tooltip-name {
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 2px;
+    line-height: 1.3;
+  }
+  .hover-tooltip-sector {
+    font-size: 10px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .hover-tooltip-desc {
+    font-size: 11px;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.55);
+    margin-bottom: 9px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 8px;
+  }
+  .hover-tooltip-collab-title {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(0,229,204,0.7);
+    margin-bottom: 4px;
+  }
+  .hover-tooltip-collab {
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+    padding: 1px 0 1px 10px;
+    position: relative;
+  }
+  .hover-tooltip-collab::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 6px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #00e5cc;
+  }
+  .hover-tooltip-website {
+    display: block;
+    margin-top: 9px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    font-size: 10px;
+    color: #00e5cc;
+    text-decoration: none;
+    letter-spacing: 0.3px;
+    transition: color 0.15s;
+    pointer-events: auto;
+  }
+  .hover-tooltip-website:hover { color: #fff; }
+
+  /* MapLibre canvas cursor */
+  .maplibregl-canvas { cursor: grab; }
+  .maplibregl-canvas:active { cursor: grabbing; }
+
+  /* Hide default map controls */
+  .maplibregl-ctrl-top-left { display: none !important; }
+
+  /* OXIN centre logo markers — GPU accelerated */
+  .maplibregl-marker { will-change: transform; }
+  .oxin-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    background: rgba(10,14,26,0.92);
+    border: 1px solid rgba(150,130,255,0.3);
+    border-radius: 0;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .oxin-marker:hover {
+    transform: scale(1.08);
+    border-color: rgba(150,130,255,0.6);
+    box-shadow: 0 4px 20px rgba(150,130,255,0.2);
+  }
+  .oxin-marker img {
+    height: 22px;
+    width: auto;
+    display: block;
+  }
+  .oxin-marker.sif-marker {
+    border-color: rgba(0,229,204,0.4);
+    box-shadow: 0 0 15px rgba(0,229,204,0.15);
+    padding: 8px 12px;
+  }
+  .oxin-marker.sif-marker:hover {
+    border-color: rgba(0,229,204,0.7);
+    box-shadow: 0 0 25px rgba(0,229,204,0.25);
+  }
+  .oxin-marker.sif-marker img {
+    height: 28px;
+  }
+
+  /* Welcome intro overlay */
+  .intro-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 1000;
+    background: rgba(10,14,26,0.97);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    transition: opacity 0.6s ease;
+  }
+  .intro-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .intro-content {
+    text-align: center;
+    max-width: 560px;
+    padding: 40px 32px;
+  }
+  .intro-badge {
+    display: inline-block;
+    padding: 5px 14px;
+    border: 1px solid rgba(0,229,204,0.3);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(0,229,204,0.7);
+    margin-bottom: 28px;
+  }
+  .intro-title {
+    font-size: 32px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  .intro-title span { color: #00e5cc; }
+  .intro-desc {
+    font-size: 15px;
+    font-weight: 300;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.55);
+    margin-bottom: 32px;
+  }
+  .intro-stats {
+    display: flex;
+    justify-content: center;
+    gap: 36px;
+    margin-bottom: 36px;
+  }
+  .intro-stat-val {
+    font-size: 28px;
+    font-weight: 800;
+    color: #00e5cc;
+  }
+  .intro-stat-lbl {
+    font-size: 10px;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+  .intro-enter {
+    display: inline-block;
+    padding: 14px 40px;
+    background: #00e5cc;
+    color: #0a0e1a;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .intro-enter:hover { background: #00ccb5; transform: translateY(-2px); }
+  .intro-how {
+    display: block;
+    margin-top: 16px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .intro-how:hover { color: rgba(255,255,255,0.5); }
+
+  /* Help guide overlay */
+  .help-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 900;
+    background: rgba(10,14,26,0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .help-overlay.visible { display: flex; }
+  .help-content {
+    max-width: 480px;
+    padding: 36px 32px;
+  }
+  .help-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 20px;
+  }
+  .help-section {
+    margin-bottom: 18px;
+  }
+  .help-section-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 8px;
+  }
+  .help-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 5px 0;
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+  }
+  .help-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .help-line {
+    width: 24px;
+    height: 2px;
+    flex-shrink: 0;
+  }
+  .help-close {
+    display: block;
+    margin-top: 24px;
+    padding: 10px 28px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.6);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .help-close:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
+
+  /* Help button (bottom-left, above CTAs) */
+  .help-btn {
+    position: fixed;
+    bottom: 50px;
+    right: 52px;
+    z-index: 100;
+    width: 32px;
+    height: 32px;
+    background: #0a0e1a;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.35);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .help-btn:hover { color: #fff; border-color: rgba(255,255,255,0.25); }
+
+  /* Snapshot date in stats bar */
+  .stat-snapshot {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.25);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Outcome text in info card */
+  .info-card-outcome {
+    font-size: 11px;
+    color: rgba(0,229,204,0.6);
+    font-style: italic;
+    margin-left: 12px;
+    margin-top: 2px;
+  }
+
+  /* View toggle in header */
+  .view-toggle {
+    margin-left: auto;
+    display: flex;
+    gap: 0;
+    pointer-events: auto;
+  }
+  .view-toggle-btn {
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.4);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 400;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .view-toggle-btn:first-child { border-right: none; }
+  .view-toggle-btn.active {
+    background: rgba(0,229,204,0.1);
+    color: #00e5cc;
+    border-color: rgba(0,229,204,0.3);
+  }
+  .view-toggle-btn:hover:not(.active) {
+    color: rgba(255,255,255,0.7);
+    border-color: rgba(255,255,255,0.2);
+  }
+
+  /* Table overlay */
+  .table-overlay {
+    position: fixed;
+    top: 62px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 500;
+    background: #0a0e1a;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .table-overlay.visible { display: flex; }
+  .table-toolbar {
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+  }
+  .table-search {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 14px;
+    color: #e0e6f0;
+    font-family: inherit;
+    font-size: 12px;
+    width: 260px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .table-search:focus { border-color: #00e5cc; }
+  .table-search::placeholder { color: rgba(255,255,255,0.25); }
+  .table-count {
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.5px;
+  }
+  .table-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 24px 80px;
+  }
+  .table-scroll::-webkit-scrollbar { width: 6px; }
+  .table-scroll::-webkit-scrollbar-track { background: transparent; }
+  .table-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  .biz-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .biz-table th {
+    position: sticky;
+    top: 0;
+    background: #0a0e1a;
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: rgba(255,255,255,0.35);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color 0.15s;
+    z-index: 1;
+  }
+  .biz-table th:hover { color: rgba(255,255,255,0.6); }
+  .biz-table th .sort-arrow { margin-left: 4px; font-size: 8px; }
+  .biz-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.6);
+    vertical-align: top;
+  }
+  .biz-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .biz-table .col-name {
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .biz-table .col-name a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .biz-table .col-name a:hover { color: #00e5cc; }
+  .biz-table .sector-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .biz-table .col-desc {
+    max-width: 340px;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.45);
+  }
+  .biz-table .col-connections {
+    text-align: center;
+    font-weight: 700;
+    color: #00e5cc;
+  }
+  .biz-table .col-stage {
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .biz-table .col-founded {
+    white-space: nowrap;
+    font-size: 11px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="intro-overlay" id="introOverlay">
+  <div class="intro-content">
+    <div class="intro-badge">Snapshot &mdash; March 2026</div>
+    <div class="intro-title">Salford's <span>Innovation Ecosystem</span></div>
+    <div class="intro-desc">47 businesses, 35+ ecosystem partners, and world-class research institutions &mdash; all connected through Salford Innovation Forum. Explore who's here, how they collaborate, and what this community has achieved.</div>
+    <div class="intro-stats">
+      <div><div class="intro-stat-val">47</div><div class="intro-stat-lbl">Businesses</div></div>
+      <div><div class="intro-stat-val">80+</div><div class="intro-stat-lbl">Collaborations</div></div>
+      <div><div class="intro-stat-val">11</div><div class="intro-stat-lbl">Sectors</div></div>
+    </div>
+    <button class="intro-enter" id="introEnter">Start Exploring</button>
+    <button class="intro-how" id="introHow">How to read this map</button>
+  </div>
+</div>
+
+<div class="help-overlay" id="helpOverlay">
+  <div class="help-content">
+    <div class="help-title">How to Read This Map</div>
+    <div class="help-section">
+      <div class="help-section-title">Nodes</div>
+      <div class="help-row"><span class="help-dot" style="background:#00d4aa"></span> Coloured circles = SIF businesses (colour = sector)</div>
+      <div class="help-row"><span class="help-dot" style="background:#ffaa64"></span> Orange circles = ecosystem partners (universities, institutions)</div>
+      <div class="help-row"><span class="help-dot" style="background:#4ade80"></span> Green circles = green infrastructure (solar, EV, research)</div>
+      <div class="help-row"><span class="help-dot" style="background:#9682ff; border-radius:2px"></span> Purple badges = OXIN innovation centres</div>
+      <div class="help-row">Larger circles = stronger community presence</div>
+    </div>
+    <div class="help-section">
+      <div class="help-section-title">Connections</div>
+      <div class="help-row"><span class="help-line" style="background:rgba(78,205,196,0.6)"></span> Solid lines = business-to-business collaborations</div>
+      <div class="help-row"><span class="help-line" style="background:repeating-linear-gradient(90deg, rgba(255,170,100,0.6) 0, rgba(255,170,100,0.6) 4px, transparent 4px, transparent 8px)"></span> Dashed orange = ecosystem connections</div>
+      <div class="help-row"><span class="help-line" style="background:repeating-linear-gradient(90deg, rgba(74,222,128,0.6) 0, rgba(74,222,128,0.6) 5px, transparent 5px, transparent 8px)"></span> Dashed green = green infrastructure links</div>
+      <div class="help-row"><span class="help-line" style="background:repeating-linear-gradient(90deg, rgba(150,130,255,0.5) 0, rgba(150,130,255,0.5) 2px, transparent 2px, transparent 6px)"></span> Dotted purple = OXIN network</div>
+    </div>
+    <div class="help-section">
+      <div class="help-section-title">Interactions</div>
+      <div class="help-row">Hover over any node to see details and connections</div>
+      <div class="help-row">Click a node for an expanded info card</div>
+      <div class="help-row">Use the search bar to find a specific business</div>
+      <div class="help-row">Use the filter panel (right) to show/hide layers</div>
+    </div>
+    <button class="help-close" id="helpClose">Got it</button>
+  </div>
+</div>
+
+<div class="header-overlay">
+  <div class="header-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 223.47 75.14"><defs><style>.cls-1{fill:#f5f5f5;}</style></defs><g id="Layer_2" data-name="Layer 2"><g id="Layer_1-2" data-name="Layer 1"><path class="cls-1" d="M47.42,12.2A35.66,35.66,0,0,1,57.9,13.76a.18.18,0,0,0,.21-.27A32.18,32.18,0,0,0,31.48,0C14.09,0,0,13,0,28.92,0,40.61,7.55,50.68,18.41,55.24A.15.15,0,0,0,18.6,55,27.35,27.35,0,0,1,15,41.52C15,26.27,29.49,12.2,47.42,12.2"/><path class="cls-1" d="M69.9,65.44v4a.31.31,0,0,1-.18.28,53.49,53.49,0,0,1-22.64,5.41c-12.74,0-22.35-5.2-29.79-11.55-1.78-1.46-4.94-4.61-6.39-6.13a.15.15,0,0,1,.18-.23c4.49,2.82,21.47,11.7,42.19.1a.12.12,0,0,0,0-.08V52.32a.11.11,0,0,1,.18-.09L69.83,65.31a.17.17,0,0,1,.07.13"/><path class="cls-1" d="M89.9,18.56C90,21.4,91.61,23,95.3,23s4.67-1.3,4.67-3.21c0-1.74-1-2.7-3.15-3l-4.33-.62c-3.18-.44-4.84-2.1-4.84-5C87.65,8,90,5.62,95,5.62c5.26,0,7.48,2.65,7.73,6H99.88c-.28-2.25-1.77-3.74-4.95-3.74s-4.36,1.32-4.36,3.21a2.54,2.54,0,0,0,2.51,2.64l4.58.68c3.26.47,5.23,2,5.23,5.06,0,3.68-2.25,5.82-7.59,5.82-6.13,0-8.21-3.21-8.21-6.72Z"/><path class="cls-1" d="M104.94,21.06c0-2.25,1.13-3.71,4.28-4.25l3.51-.59c1.35-.22,2-.64,2-1.63,0-1.26-.67-2.14-3.09-2.14s-3.4.93-3.55,2.7h-2.81c0-3,2.25-4.86,6.25-4.86s5.79,1.77,5.79,4.36v7c0,1,0,1.89.14,3.21h-2.56a30.35,30.35,0,0,1-.17-3.18,5,5,0,0,1-5.09,3.54C106.74,25.19,104.94,23.65,104.94,21.06ZM114.7,18v-.84a6.68,6.68,0,0,1-2.5,1l-1.94.45c-1.75.39-2.5,1.06-2.5,2.36s1,2.08,2.44,2.08C113.15,23,114.7,20.81,114.7,18Z"/><path class="cls-1" d="M120.24,5.14h2.81V24.83h-2.81Z"/><path class="cls-1" d="M127.69,12.93H125.3V11.47l2.39-.81V8.6c0-2.25,1.13-3.46,4.53-3.46h3.06V7.25h-5v3.52h4.16v2.16H130.5v11.9h-2.81Z"/><path class="cls-1" d="M135,17.77c0-4.11,2.36-7.45,7.26-7.45s7.25,3.37,7.25,7.45-2.36,7.51-7.25,7.51S135,21.93,135,17.77ZM142.29,23c3,0,4.41-1.49,4.41-5.23s-1.38-5.23-4.41-5.23-4.42,1.49-4.42,5.23S139.25,23,142.29,23Z"/><path class="cls-1" d="M160.09,10.54v2.73h-.71c-3.76,0-4.66,2.36-4.66,6.19v5.37H151.9V10.77h2.79v3.4a5.14,5.14,0,0,1,5-3.63Z"/><path class="cls-1" d="M175.78,5.14V24.83H173V22.41a5.42,5.42,0,0,1-5.21,2.87c-4.52,0-6.55-3.35-6.55-7.48s2-7.48,6.55-7.48A5.42,5.42,0,0,1,173,13.19v-8ZM173,17.8c0-3.6-1.66-5.23-4.62-5.23-3.12,0-4.3,1.74-4.3,5.23s1.18,5.23,4.3,5.23C171.31,23,173,21.4,173,17.8Z"/><path class="cls-1" d="M94.29,31.81v14h3.82v2.33H87.57V45.85h3.82v-14H87.57V29.48H98.11v2.33Z"/><path class="cls-1" d="M113.94,39.41v8.77h-2.81V39.66c0-2.95-1.35-3.66-3.12-3.66-2.76,0-4.28,1.78-4.28,6.25v5.93h-2.81V34.12h2.81v3.15a5.2,5.2,0,0,1,5.09-3.6C112.56,33.67,113.94,35.72,113.94,39.41Z"/><path class="cls-1" d="M130,39.41v8.77h-2.82V39.66c0-2.95-1.35-3.66-3.12-3.66-2.75,0-4.27,1.78-4.27,6.25v5.93H117V34.12h2.81v3.15a5.19,5.19,0,0,1,5.09-3.6C128.65,33.67,130,35.72,130,39.41Z"/><path class="cls-1" d="M132.11,41.12c0-4.1,2.36-7.45,7.25-7.45s7.26,3.37,7.26,7.45-2.37,7.51-7.26,7.51S132.11,45.28,132.11,41.12Zm7.25,5.26c3,0,4.42-1.49,4.42-5.23s-1.38-5.23-4.42-5.23S135,37.41,135,41.15,136.32,46.38,139.36,46.38Z"/><path class="cls-1" d="M161.52,34.12l-5.34,14.06h-3.72l-5.34-14.06H150l4.39,11.56,4.38-11.56Z"/><path class="cls-1" d="M162.34,44.41c0-2.25,1.12-3.71,4.27-4.24l3.51-.59c1.35-.23,2-.65,2-1.64,0-1.26-.67-2.13-3.09-2.13s-3.4.92-3.54,2.7h-2.82c0-3,2.25-4.87,6.25-4.87s5.79,1.77,5.79,4.36v7c0,1,0,1.89.14,3.21h-2.56a30.35,30.35,0,0,1-.17-3.18A5,5,0,0,1,167,48.55C164.14,48.55,162.34,47,162.34,44.41Zm9.75-3.06V40.5a6.52,6.52,0,0,1-2.5,1l-1.94.45c-1.74.39-2.5,1.07-2.5,2.36s1,2.08,2.44,2.08C170.55,46.38,172.09,44.16,172.09,41.35Z"/><path class="cls-1" d="M178.7,44.05V36.28H176V34.82l2.92-1,1.16-2.87h1.4v3.18H186v2.16h-4.5v9.65h4.22v2.25H183C179.55,48.18,178.7,46.86,178.7,44.05Z"/><path class="cls-1" d="M187.84,29.48h3.54V32h-3.54Zm.37,4.64H191V48.18h-2.81Z"/><path class="cls-1" d="M193.58,41.12c0-4.1,2.36-7.45,7.25-7.45s7.26,3.37,7.26,7.45-2.37,7.51-7.26,7.51S193.58,45.28,193.58,41.12Zm7.25,5.26c3,0,4.42-1.49,4.42-5.23s-1.38-5.23-4.42-5.23-4.41,1.49-4.41,5.23S197.79,46.38,200.83,46.38Z"/><path class="cls-1" d="M223.47,39.41v8.77h-2.81V39.66c0-2.95-1.35-3.66-3.13-3.66-2.75,0-4.27,1.78-4.27,6.25v5.93h-2.81V34.12h2.81v3.15a5.19,5.19,0,0,1,5.09-3.6C222.09,33.67,223.47,35.72,223.47,39.41Z"/><path class="cls-1" d="M90.46,55.17V61h10.38v2.28H90.46v8.24H87.57V52.83h14.11v2.34Z"/><path class="cls-1" d="M102.75,64.47c0-4.1,2.36-7.45,7.25-7.45s7.26,3.38,7.26,7.45S114.9,72,110,72,102.75,68.64,102.75,64.47ZM110,69.73c3,0,4.42-1.49,4.42-5.23S113,59.27,110,59.27s-4.41,1.49-4.41,5.23S107,69.73,110,69.73Z"/><path class="cls-1" d="M127.8,57.25V60h-.7c-3.77,0-4.67,2.37-4.67,6.19v5.37h-2.81V57.47h2.79v3.4a5.14,5.14,0,0,1,5-3.62Z"/><path class="cls-1" d="M142.82,57.47V71.53H140V68.47A5,5,0,0,1,135,72c-3.74,0-5.23-2-5.23-5.73V57.47h2.81V66c0,3,1.41,3.66,3.29,3.66,2.51,0,4.11-2.05,4.11-6.25V57.47Z"/><path class="cls-1" d="M168.24,62.76v8.77h-2.81V63c0-2.67-1.13-3.65-3-3.65-2.59,0-4,1.77-4,6.24v5.93H155.7V63c0-2.67-1.13-3.65-3-3.65-2.53,0-4,1.77-4,6.24v5.93h-2.82V57.47h2.82v3.07A5,5,0,0,1,153.67,57a4.19,4.19,0,0,1,4.59,3.63A5.14,5.14,0,0,1,163.4,57C166.75,57,168.24,59.07,168.24,62.76Z"/></g></g></svg>
+  </div>
+  <div class="header-text">
+    <div class="header-title">Salford Collaboration Map</div>
+    <div class="header-subtitle">Where Greater Manchester's most ambitious businesses connect</div>
+  </div>
+  <div class="view-toggle">
+    <button class="view-toggle-btn active" id="viewMap">Map</button>
+    <button class="view-toggle-btn" id="viewTable">Table</button>
+  </div>
+</div>
+
+<div class="search-box" id="searchBox">
+  <span class="search-icon">&#x1F50D;</span>
+  <input type="text" class="search-input" placeholder="Type a business name..." id="searchInput" autocomplete="off">
+  <div class="search-dropdown" id="searchDropdown"></div>
+</div>
+
+<div class="cta-stack">
+  <a class="cta-btn cta-primary" href="https://www.salfordinnovationforum.co.uk/contact/" target="_blank" rel="noopener">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    Join This Community
+  </a>
+  <a class="cta-btn cta-secondary" href="https://www.salfordinnovationforum.co.uk/office-space/" target="_blank" rel="noopener">
+    <img class="cta-avatar" src="kayleigh.jpeg" alt="Kayleigh">
+    Get Office Space
+  </a>
+  <a class="cta-btn cta-tertiary" href="https://www.salfordinnovationforum.co.uk/business-support/" target="_blank" rel="noopener">
+    <img class="cta-avatar" src="artur.jpeg" alt="Artur">
+    Business Support
+  </a>
+</div>
+
+<button class="help-btn" id="helpBtn" title="How to read this map">?</button>
+<button class="fullscreen-corner-btn" id="fullscreenBtn">&#x26F6;</button>
+
+<div class="filter-panel" id="filterPanel"></div>
+
+<div class="hover-tooltip" id="hoverTooltip">
+  <div class="hover-tooltip-header">
+    <div class="hover-tooltip-logo" id="hoverLogo"></div>
+    <div class="hover-tooltip-meta">
+      <div class="hover-tooltip-name" id="hoverName"></div>
+      <div class="hover-tooltip-sector" id="hoverSector"></div>
+    </div>
+  </div>
+  <div class="hover-tooltip-desc" id="hoverDesc"></div>
+  <div id="hoverCollabs"></div>
+  <a class="hover-tooltip-website" id="hoverWebsite" href="#" target="_blank" rel="noopener" style="display:none"></a>
+</div>
+
+<div class="info-card" id="infoCard">
+  <button class="info-card-close" id="infoCardClose">&times;</button>
+  <div class="info-card-sector" id="infoSector"></div>
+  <div class="info-card-name" id="infoName"></div>
+  <div class="info-card-type" id="infoType"></div>
+  <div class="info-card-desc" id="infoDesc"></div>
+  <div class="info-card-connections-title" id="infoConnTitle">Connections</div>
+  <div id="infoConnections"></div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat"><span class="stat-value">80+</span><span class="stat-label">Active Collaborations Across Salford</span></div>
+  <div class="stat"><span class="stat-value">47</span><span class="stat-label">Businesses</span></div>
+  <div class="stat"><span class="stat-value">35+</span><span class="stat-label">Ecosystem Partners</span></div>
+  <div class="stat"><span class="stat-value">6</span><span class="stat-label">OXIN Centres</span></div>
+  <span class="stat-snapshot">Snapshot &mdash; March 2026</span>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="legend-line solid"></span>Customer links</div>
+  <div class="legend-item"><span class="legend-line dashed"></span>Ecosystem links</div>
+  <div class="legend-item"><span class="legend-line dotted"></span>OXIN network</div>
+  <div class="legend-item"><span class="legend-line green-dash"></span>Green infra</div>
+</div>
+
+<div class="tour-card" id="tourCard">
+  <div class="tour-card-step" id="tourStep"></div>
+  <div class="tour-card-title" id="tourTitle"></div>
+  <div class="tour-card-desc" id="tourDesc"></div>
+  <div class="tour-card-stats" id="tourStats"></div>
+  <div class="tour-nav">
+    <button class="tour-nav-btn tour-nav-skip" id="tourSkip">End tour</button>
+    <button class="tour-nav-btn tour-nav-next" id="tourNext">Next</button>
+  </div>
+  <div class="tour-dots" id="tourDots"></div>
+</div>
+
+<div class="table-overlay" id="tableOverlay">
+  <div class="table-toolbar">
+    <input type="text" class="table-search" placeholder="Search businesses..." id="tableSearch" autocomplete="off">
+    <span class="table-count" id="tableCount"></span>
+  </div>
+  <div class="table-scroll">
+    <table class="biz-table">
+      <thead>
+        <tr>
+          <th data-sort="name">Name <span class="sort-arrow"></span></th>
+          <th data-sort="sector">Sector <span class="sort-arrow"></span></th>
+          <th data-sort="stage">Stage <span class="sort-arrow"></span></th>
+          <th data-sort="founded">Founded <span class="sort-arrow"></span></th>
+          <th>Description</th>
+          <th data-sort="connections">Links <span class="sort-arrow"></span></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script>
+// ==========================================
+// DATA
+// ==========================================
+
+const SECTOR_COLORS = {
+  'Technology & Software': '#00d4aa',
+  'Charity & Social Enterprise': '#ff6b9d',
+  'Education & Training': '#ffd93d',
+  'Health, Care & Wellbeing': '#6bcb77',
+  'Real Estate & Property': '#c084fc',
+  'Professional Services': '#67b8f0',
+  'Creative & Media': '#ff8c42',
+  'Employment Support': '#f87171',
+  'Retail & E-commerce': '#a78bfa',
+  'Marketing': '#fb923c',
+  'Other': '#94a3b8'
+};
+
+const GREEN_COLOR = '#4ade80';
+const GREEN_SUBSECTORS = {
+  'Solar & Renewables': '#fbbf24',
+  'EV Infrastructure': '#38bdf8',
+  'Sustainable Transport': '#a3e635',
+  'Research & Innovation': '#c084fc',
+  'Programme': '#f9a8d4'
+};
+
+// SIF location — corner of Frederick Road & Seaford Road, Salford M6 6FP
+// Verified: south end of Frederick Road, near The Crescent / Peel Park
+const SIF = { lat: 53.4866, lng: -2.2726 };
+
+// Customer data (positions computed below)
+const customerData = [
+  // Technology & Software
+  { name: 'XpertRule Software', sector: 'Technology & Software', desc: 'AI decision intelligence. 40-year-old AI company, Gartner-recognised. 70+ projects globally.', stage: 'Established', strength: 5, founded: '1985' },
+  { name: 'Qumulus', sector: 'Technology & Software', desc: '£350k Innovate UK Smart Grant. Manchester Angels investor. Featured in BusinessCloud.', stage: 'Early Revenue', strength: 4, founded: '2021' },
+  { name: 'Code Maze', sector: 'Technology & Software', desc: 'Software development. Founder Dr Priyaa Thavasimani, IET Young Woman Engineer finalist.', stage: 'Early Revenue', strength: 2, founded: '2025' },
+  { name: 'XE Business', sector: 'Technology & Software', desc: 'Specialist apparel & textiles ERP software. 25+ year history.', stage: 'Established', strength: 1, founded: '1999' },
+  { name: 'XN Global Systems', sector: 'Technology & Software', desc: 'Global hospitality tech — POS, PMS, apartments. ISO 27001. 50+ countries.', stage: 'Established', strength: 5, founded: '2006' },
+  { name: 'IPEX Soft', sector: 'Technology & Software', desc: 'Web development. Partnership with Murphy Waldron Estates.', stage: 'Pre-revenue', strength: 1, founded: '2025' },
+  { name: 'Lumine Soft', sector: 'Technology & Software', desc: 'Microsoft Partner. Software consultancy.', stage: 'Early Revenue', strength: 2, founded: '2020' },
+  { name: 'Luwasuite', sector: 'Technology & Software', desc: 'Home Office sponsor licence compliance SaaS. 140+ employer clients.', stage: 'Pre-revenue', strength: 2, founded: '2025' },
+  { name: 'MADE Product Development', sector: 'Technology & Software', desc: 'Electronic product design. 12-year SIF anchor. Clients: HVPD, WCCTV, Dermalux.', stage: 'Growth', strength: 4, founded: '2013' },
+
+  // Charity & Social Enterprise
+  { name: 'Rio Ferdinand Foundation', sector: 'Charity & Social Enterprise', desc: '15,000+ young people into work. €1.2m PEACEPLUS EU grant. Live Nation, Warner Music, Findel.', stage: 'Established', strength: 5, founded: '2012' },
+  { name: 'Unlimited Potential', sector: 'Charity & Social Enterprise', desc: 'Healthier communities. EU Innovation in Politics Awards finalist. Salford Corporate Plan embedded.', stage: 'Established', strength: 5, founded: '2001' },
+  { name: 'Manchester City Mission', sector: 'Charity & Social Enterprise', desc: 'Food clubs, community support, prison chaplaincy. Pendleton Together partner.', stage: 'Established', strength: 3, founded: '2016' },
+  { name: 'Inspiring Communities Together', sector: 'Charity & Social Enterprise', desc: 'First GM Community Led Housing org with Registered Provider status. Age Friendly Salford.', stage: 'Established', strength: 5, founded: '2011' },
+  { name: 'Lifeline NW CIC', sector: 'Charity & Social Enterprise', desc: 'Supported housing. 16 sites, 140+ supported. £1.5m GM expansion.', stage: 'Growth', strength: 3, founded: '2018' },
+  { name: 'Advocacy Focus', sector: 'Charity & Social Enterprise', desc: 'Advocacy for Salford, Trafford, Lancashire. Mind Gold Award x4.', stage: 'Established', strength: 4, founded: '1998' },
+  { name: 'A-Z Communities', sector: 'Charity & Social Enterprise', desc: 'Digital inclusion. Salford Digital Everyone partner.', stage: 'Early', strength: 2, founded: '2022' },
+  { name: 'ABC Fostering', sector: 'Charity & Social Enterprise', desc: 'Foster care agency. Seeking Ofsted registration.', stage: 'Pre-revenue', strength: 1, founded: '2024' },
+
+  // Education & Training
+  { name: 'Emotional Intelligence Academy', sector: 'Education & Training', desc: 'World-leading EI training. Co-owns Paul Ekman International. MMU MSc. Discovery Channel.', stage: 'Established', strength: 5, founded: '2009' },
+  { name: 'Spotlight Training', sector: 'Education & Training', desc: 'Jamie Ryder. SIF success story — 70+ prospects identified.', stage: 'Early Revenue', strength: 1, founded: '2022' },
+  { name: 'JC Academy of Finance', sector: 'Education & Training', desc: 'M&A Institute. 10,000+ professionals trained. AI Deal Simulation.', stage: 'Early Revenue', strength: 2, founded: '2022' },
+  { name: 'Ready 4 Work', sector: 'Education & Training', desc: 'Employment support. Sister org to Ready 4 Home. Housing-to-employment pathway.', stage: 'Growth', strength: 3, founded: '2022' },
+
+  // Health, Care & Wellbeing
+  { name: 'Honey-Serenity Care', sector: 'Health, Care & Wellbeing', desc: 'Homecare and supported living.', stage: 'Pre-revenue', strength: 1, founded: '2025' },
+  { name: 'V Care Health Supplies', sector: 'Health, Care & Wellbeing', desc: 'Medical equipment supply. 26+ manufacturer partners.', stage: 'Growth', strength: 1, founded: '2019' },
+  { name: 'Intimacy Insights', sector: 'Health, Care & Wellbeing', desc: 'Relationship therapy. COSRT member.', stage: 'Pre-revenue', strength: 1, founded: '2024' },
+  { name: 'Centric Support', sector: 'Health, Care & Wellbeing', desc: 'Support services.', stage: 'Pre-revenue', strength: 1, founded: '2023' },
+
+  // Real Estate & Property
+  { name: 'Murphy Waldron Estates', sector: 'Real Estate & Property', desc: 'Full-service estate agency. Sales, lettings, management. 6,900+ FB likes.', stage: 'Growth', strength: 2, founded: '2017' },
+  { name: 'BlueFin Management', sector: 'Real Estate & Property', desc: 'Property management. Recruiting in Salford.', stage: 'Early', strength: 1, founded: '2024' },
+  { name: 'U&S Investment', sector: 'Real Estate & Property', desc: 'Property investment. Lumara Capital — Kilgraston School purchase (£1.73m). National press.', stage: 'Early Revenue', strength: 3, founded: '2016' },
+  { name: 'Big Easy Services', sector: 'Real Estate & Property', desc: 'Green energy retrofitting. 10 years ECO scheme. TrustMark. Solar, heat pumps.', stage: 'Growth', strength: 2, founded: '2016' },
+
+  // Professional Services
+  { name: 'New Square Law', sector: 'Professional Services', desc: 'SRA-authorised law firm.', stage: 'Pre-revenue', strength: 1, founded: '2024' },
+  { name: 'Braiden Acoustics', sector: 'Professional Services', desc: 'Acoustic consultancy. UoS alumnus. Institute of Acoustics.', stage: 'Established', strength: 2, founded: '2008' },
+  { name: 'NWUPC', sector: 'Professional Services', desc: '25 NW universities purchasing consortium. £multi-million frameworks.', stage: 'Established', strength: 5, founded: '2000' },
+  { name: 'Unizen Recruitment', sector: 'Professional Services', desc: 'Recruitment and business solutions.', stage: 'Established', strength: 1, founded: '2013' },
+
+  // Creative & Media
+  { name: 'Further Works', sector: 'Creative & Media', desc: 'Photo/video. UoS Launch@Salford. Clients: Microsoft, NHS, Primark, Barbour.', stage: 'Early Revenue', strength: 4, founded: '2023' },
+  { name: 'Saz Media', sector: 'Creative & Media', desc: 'Video production social enterprise. NW Young Leader 2025. MCC, Co-op clients.', stage: 'Growth', strength: 4, founded: '2017' },
+  { name: 'IvonMeldaByNwanne', sector: 'Creative & Media', desc: 'Crochet hair products and training. 10,600+ FB likes.', stage: 'Pre-revenue', strength: 1, founded: '2025' },
+
+  // Employment Support
+  { name: 'Employment & Regen Partnerships', sector: 'Employment Support', desc: 'Employment and regeneration consultancy.', stage: 'Established', strength: 1, founded: 'N/A' },
+  { name: 'Salford Supply Desk', sector: 'Employment Support', desc: 'Education supply. REC Gold (top 10%). Official Salford RLFC partner.', stage: 'Established', strength: 3, founded: '2009' },
+
+  // Marketing
+  { name: 'Optimo', sector: 'Marketing', desc: 'Digital marketing at MediaCityUK. Google, Bing, Facebook Partner.', stage: 'Growth', strength: 3, founded: '2020' },
+
+  // Retail & E-commerce
+  { name: 'Manchester Furniture Supplies', sector: 'Retail & E-commerce', desc: 'Wholesale furniture. UK, Ireland, North Africa.', stage: 'Established', strength: 1, founded: '2010' },
+  { name: 'Numlock / Continuity Shop', sector: 'Retail & E-commerce', desc: 'World-class business continuity. BCI Hall of Fame. Bank of England, HSBC, BBC, Disney.', stage: 'Established', strength: 4, founded: '2004' },
+
+  // Other
+  { name: 'Suja Driving School', sector: 'Other', desc: '92% first-time pass rate. 2,000+ five-star reviews. National expansion.', stage: 'Growth', strength: 2, founded: '2017' },
+  { name: 'Microrama', sector: 'Other', desc: 'Pharmaceutical and packaging import-export.', stage: 'Established', strength: 1, founded: '2011' },
+  { name: 'Green Chamber', sector: 'Other', desc: 'Sandro Lopes Architecture. International projects inc. Cape Verde.', stage: 'Growth', strength: 2, founded: '2019' },
+  { name: 'ABEKS', sector: 'Other', desc: 'Newly incorporated at SIF.', stage: 'Pre-company', strength: 1, founded: '2026' },
+  { name: 'Josiah Lekundayo', sector: 'Other', desc: 'Cybersecurity. Ex-NCC Group, current NetSPI.', stage: 'Pre-company', strength: 2, founded: 'N/A' },
+  { name: 'Ready 4 Home', sector: 'Other', desc: 'Supported housing CIC. Sister org to Ready 4 Work.', stage: 'Growth', strength: 3, founded: 'N/A' }
+];
+
+// Compute customer positions: tight sector-grouped arcs around SIF
+// Radius ~0.0006 degrees ≈ ~50m — tight cluster visible as "one hub"
+const customers = (() => {
+  const sectorOrder = Object.keys(SECTOR_COLORS);
+  const sectorGroups = {};
+  customerData.forEach(c => {
+    if (!sectorGroups[c.sector]) sectorGroups[c.sector] = [];
+    sectorGroups[c.sector].push(c);
+  });
+
+  const result = [];
+  const activeSectors = sectorOrder.filter(s => sectorGroups[s]);
+  const sectorArc = (2 * Math.PI) / activeSectors.length;
+
+  activeSectors.forEach((sector, si) => {
+    const group = sectorGroups[sector];
+    const baseAngle = sectorArc * si - Math.PI / 2;
+
+    group.forEach((customer, ci) => {
+      // Stronger nodes closer to centre, weaker ones further out
+      const ring = ci < 3 ? 0.0004 : ci < 6 ? 0.0007 : 0.0010;
+      const jitter = (ci - group.length / 2) * 0.08;
+      const angle = baseAngle + jitter;
+      // Longitude needs wider spread since 1° lng ≈ 65km vs 1° lat ≈ 111km at this latitude
+      const lat = SIF.lat + Math.sin(angle) * ring;
+      const lng = SIF.lng + Math.cos(angle) * ring * 1.7;
+
+      result.push({ ...customer, lat, lng });
+    });
+  });
+
+  return result;
+})();
+
+// Ecosystem partners at real locations
+const ecosystemPartners = [
+  // === POLE 1: University of Salford & The Crescent ===
+  { name: 'University of Salford', lat: 53.4862, lng: -2.2690, desc: '~23,000 students. Strong in engineering, health sciences, media, built environment, acoustics. Founding Innovation Triangle partner.', size: 'large' },
+  { name: 'NERIC', lat: 53.4875, lng: -2.2720, desc: '£16m Northern Engineering and Robotics Innovation Centre. Helps SMEs adopt robotics, automation, and Industry 4.0 technologies.', size: 'medium' },
+  { name: 'Energy House Labs', lat: 53.4882, lng: -2.2770, desc: 'World-leading climate-controlled housing test chambers. Energy House 2.0 is globally unique. Net-zero housing research.', size: 'medium' },
+  { name: 'Launch@SalfordUni', lat: 53.4890, lng: -2.2775, desc: 'Student/alumni business incubator. 6-month programme, £26.5k start-up fund. Pipeline of early-stage ventures.', size: 'small' },
+  { name: 'Acoustics Research Centre', lat: 53.4868, lng: -2.2715, desc: '60+ years of research. UK\'s largest concentration of acoustic facilities. Anechoic chambers, reverberation rooms.', size: 'small' },
+  { name: 'English Cities Fund', lat: 53.4855, lng: -2.2680, desc: '£2.5bn Crescent Masterplan. Homes England, Legal & General, Muse. 3,000+ new homes. Salford Rise bridge completing 2026.', size: 'medium' },
+  { name: 'Salford Crescent Station', lat: 53.4870, lng: -2.2760, desc: 'Major rail station. Services to Manchester, Bolton. Future Metrolink to MediaCityUK proposed.', size: 'small' },
+  { name: 'OI Finance Angel Network', lat: 53.4900, lng: -2.2650, desc: '7 annual showcase events for SIF businesses. Part of Oxford Innovation network.', size: 'medium' },
+
+  // === POLE 2: MediaCityUK & Salford Quays ===
+  { name: 'MediaCityUK', lat: 53.4726, lng: -2.2975, desc: '200-acre hub, 250+ businesses. Wholly owned by Landsec. Phase 2: 1.6m additional sq ft, £750m GDV. Set to double in size.', size: 'large' },
+  { name: 'BBC North', lat: 53.4732, lng: -2.2985, desc: '~3,000 staff. BBC Breakfast, Children\'s, Sport, R&D, iPlayer, Sounds, Children in Need. Largest MediaCity tenant.', size: 'large' },
+  { name: 'ITV Granada', lat: 53.4728, lng: -2.2965, desc: '~750 employees. ITV\'s northern hub. Granada News, ITV Studios production.', size: 'medium' },
+  { name: 'dock10 Studios', lat: 53.4720, lng: -2.2970, desc: '10 purpose-built TV studios, 4K UHD virtual production via Unreal Engine. Match of the Day, Countdown, Blue Peter.', size: 'medium' },
+  { name: 'HOST / IN4 Group', lat: 53.4735, lng: -2.2990, desc: 'Home of Skills & Technology. Innovation hub: AI, gaming, cyber, immersive tech. 392 businesses supported. £22.6m social value.', size: 'medium' },
+  { name: 'MITIH', lat: 53.4730, lng: -2.3000, desc: 'MediaCity Immersive Technologies Innovation Hub. Innovate UK-funded. 250+ businesses engaged. Creative AI, spatial computing.', size: 'medium' },
+  { name: 'Skills City', lat: 53.4738, lng: -2.2980, desc: '450 tech career starts/year for women and BAME communities. Cyber, data, cloud, software, creative digital.', size: 'small' },
+  { name: 'Barclays Eagle Labs', lat: 53.4725, lng: -2.2960, desc: 'Barclays\' first northern Eagle Lab. Mentoring, prototyping (3D printers, laser cutters), events, community.', size: 'small' },
+  { name: 'The Lowry', lat: 53.4710, lng: -2.2960, desc: '1,730-seat Lyric + 466-seat Quays theatres. Gallery. 850,000+ visitors/year. Cultural anchor of Salford Quays.', size: 'medium' },
+  { name: 'Kellogg\'s UK HQ', lat: 53.4728, lng: -2.2972, desc: 'Global cereal company\'s UK headquarters at MediaCityUK. Major FMCG corporate presence.', size: 'small' },
+  { name: 'Ericsson', lat: 53.4733, lng: -2.2995, desc: 'Global telecoms infrastructure. 5G, IoT, connectivity. Smart city and Industry 4.0 applications.', size: 'small' },
+
+  // === POLE 3: Salford Royal & Health Innovation ===
+  { name: 'Salford Royal Hospital', lat: 53.4874, lng: -2.3252, desc: 'Northern Care Alliance NHS Trust. ~20,000 staff, 1m+ patients. NHS Global Digital Exemplar. £25m Hitachi digital care deal.', size: 'large' },
+  { name: 'Health Innovation Manchester', lat: 53.4610, lng: -2.2260, desc: 'GM Academic Health Science System. Bridges NHS, academia, industry. Runs Health Innovation Accelerator and DEVOTE programme.', size: 'medium' },
+  { name: 'NIHR Clinical Research', lat: 53.4878, lng: -2.3240, desc: 'World-class clinical trials facility at Salford Royal. Experimental medicine, cancer, respiratory, rare genetic disorders.', size: 'small' },
+
+  // === Across the Triangle / Greater Manchester ===
+  { name: 'Salford City Council', lat: 53.4836, lng: -2.2955, desc: 'Vision: 40,000 new homes + 40,000 new jobs by 2040. Innovation Triangle is the centrepiece of economic strategy.', size: 'large' },
+  { name: 'GMCA', lat: 53.4774, lng: -2.2445, desc: '£33M Innovation Accelerator. Funds MITIH and triangle programmes. Regional devolved authority.', size: 'large' },
+  { name: 'Pendleton Together', lat: 53.4900, lng: -2.2960, desc: '£650m regeneration. Phoenix Quarter: 485 low-carbon homes. Between SIF and Salford Royal.', size: 'small' },
+  { name: 'University of Manchester', lat: 53.4668, lng: -2.2339, desc: 'Oxford Road Corridor, ID Manchester (£1.5B innovation district), Turing Innovation Hub.', size: 'large' },
+  { name: 'Manchester Met University', lat: 53.4710, lng: -2.2389, desc: 'Collaborative MSc with EIA Group. Research partnerships across GM.', size: 'medium' },
+  { name: 'The Manchester College', lat: 53.4789, lng: -2.2485, desc: 'Youth programmes with Rio Ferdinand Foundation. Education delivery partner.', size: 'medium' },
+  { name: 'The Growth Company', lat: 53.4795, lng: -2.2442, desc: "GM's dedicated business support organisation.", size: 'medium' },
+  { name: 'Innovate UK', lat: 53.4920, lng: -2.2500, desc: 'Smart Grants, Knowledge Transfer Partnerships. Major funder of triangle programmes.', size: 'medium' },
+  { name: 'Bruntwood SciTech', lat: 53.4640, lng: -2.2320, desc: 'Manchester Science Partnerships. Co-investment in innovation space.', size: 'medium' },
+  { name: 'Google for Startups', lat: 53.4850, lng: -2.2350, desc: 'Global startup accelerator programme.', size: 'small' },
+  { name: 'Salford RLFC', lat: 53.4887, lng: -2.3350, desc: 'Official partnership with Salford Supply Desk. Red Devils Challenge schools programme.', size: 'small' },
+  { name: 'HMP Forest Bank', lat: 53.5020, lng: -2.3200, desc: 'Prison chaplaincy programme with Manchester City Mission.', size: 'small' },
+  { name: 'Invest Salford', lat: 53.4850, lng: -2.2900, desc: 'Salford Council\'s inward investment service. Promotes the Innovation Triangle as a business destination.', size: 'small' },
+];
+
+// Green Infrastructure
+const greenInfraData = [
+  // Solar & Renewables
+  { name: 'Little Hulton Solar Farm', lat: 53.5361, lng: -2.4218, subsector: 'Solar & Renewables', desc: "Salford's first 2MW solar farm. 3,774 panels on 3.8 hectares generating 2,000+ MWh/year, powering ~800 homes. Saves 1,000+ tonnes CO₂ annually. ERDF co-funded.", status: 'Operational', size: 'large' },
+  { name: 'Solar Car Ports — Turnpike House', lat: 53.4839, lng: -2.3189, subsector: 'Solar & Renewables', desc: 'Solar carports at Salford Council depot. 477kW capacity, 1,575 panels across two sites. Generates electricity for depot buildings. £1.07M, ERDF part-funded.', status: 'Operational', size: 'medium' },
+  { name: 'Solar Car Ports — Swinton', lat: 53.5112, lng: -2.3277, subsector: 'Solar & Renewables', desc: 'Solar carports at Swinton Hall Road depot. 177kW capacity. Paired with Turnpike House for combined 0.5MW output. Saves 270 tonnes CO₂/year.', status: 'Operational', size: 'small' },
+  { name: 'MediaCity Energy Centre', lat: 53.4737, lng: -2.2988, subsector: 'Solar & Renewables', desc: 'Trigeneration CHP plant at MediaCityUK. 2MW delivering ~16GWh electricity, ~13GWh heat, ~6GWh cooling annually. Serves BBC, ITV, UoS campus and ~900 residential customers.', status: 'Operational', size: 'large' },
+  { name: 'MediaCity Heat Network (Phase 2)', lat: 53.4745, lng: -2.2995, subsector: 'Solar & Renewables', desc: 'Expansion using water source heat pumps from Manchester Ship Canal. Will serve 2,500+ new residential units in MediaCity Phase 2. Green Heat Network Fund supported.', status: 'In development', size: 'medium' },
+  { name: 'Trafford Green Hydrogen', lat: 53.4295, lng: -2.4050, subsector: 'Solar & Renewables', desc: "UK's largest consented green hydrogen scheme. First phase 20MW at former Carrington Power Station. Will reduce CO₂ by 14,000+ tonnes/year. Ultimate capacity: 200MW.", status: 'Pre-construction', size: 'large' },
+  // EV Infrastructure
+  { name: 'Be.EV Network', lat: 53.4760, lng: -2.2520, subsector: 'EV Infrastructure', desc: "GM's publicly owned EV charging network. 2,400+ public chargers, appointed by TfGM. £16M+ government funding secured. Target: 23,000 charge points by 2035.", status: 'Operational', size: 'large' },
+  { name: 'Manchester Charging Oasis', lat: 53.4955, lng: -2.1920, subsector: 'EV Infrastructure', desc: "UK's first Charging Oasis. 12 ultra-rapid 300kW bays on converted derelict petrol station. Adds 325 miles range in 20 minutes. Brownfield regeneration showcase.", status: 'Operational', size: 'medium' },
+  { name: 'evyve MediaCity', lat: 53.4727, lng: -2.2972, subsector: 'EV Infrastructure', desc: 'Private EV charging hub at MediaCityUK Broadway. 20 chargers up to 22kW. One of three evyve Salford Quays locations (36 chargers total).', status: 'Operational', size: 'small' },
+  // Research & Innovation
+  { name: 'Energy House 2.0', lat: 53.4878, lng: -2.2748, subsector: 'Research & Innovation', desc: "World's largest building energy efficiency research facility. £16M. Full-size houses in climate chambers (-20°C to +40°C). Partners: Barratt Redrow, Bellway, Saint-Gobain.", status: 'Operational', size: 'large' },
+  { name: 'Manchester Fuel Cell Innovation Centre', lat: 53.4710, lng: -2.2384, subsector: 'Research & Innovation', desc: '£4.1M hydrogen fuel cell R&D hub at Manchester Met. Leading £70M HYTECH national hydrogen hub bid with UoS, UoM, Royce Institute, NPL, GMCA.', status: 'Operational', size: 'large' },
+  { name: 'Atom Valley SMMC', lat: 53.5910, lng: -2.1550, subsector: 'Research & Innovation', desc: 'Sustainable Materials & Manufacturing Centre at Kingsway Business Park. 2,724sqm R&D facility. Part of Atom Valley — 17M sqft, up to 20,000 jobs.', status: 'Under construction', size: 'medium' },
+  // Programmes (placed near their lead org)
+  { name: 'Energy Innovation Agency', lat: 53.4790, lng: -2.2490, subsector: 'Programme', desc: 'Public-private partnership for GM carbon neutral 2038. Members: GMCA, Growth Company, Hitachi, Bruntwood, SSE, UoM, MMU, UoS. Bridges the 97Mt carbon gap.', status: 'Operational', size: 'large' },
+  // Sustainable Transport
+  { name: 'Metrolink Crescent Extension', lat: 53.4790, lng: -2.2810, subsector: 'Sustainable Transport', desc: 'Planned 1.5km Metrolink link from Salford Quays to Salford Crescent. Construction begins summer 2026. Connects MediaCity directly to UoS and SIF corridor.', status: 'Planned (2026)', size: 'large' },
+];
+
+// Green infrastructure connections
+const greenConnections = [
+  // Energy House 2.0
+  { from: 'Energy House 2.0', to: 'University of Salford', label: 'Home institution' },
+  { from: 'Energy House 2.0', to: 'Big Easy Services', label: 'R&D-to-practice: retrofit solutions' },
+  { from: 'Energy House 2.0', to: 'Braiden Acoustics', label: 'Building performance research' },
+  { from: 'Energy House 2.0', to: 'MADE Product Development', label: 'IoT building monitoring' },
+  { from: 'Energy House 2.0', to: 'Energy Innovation Agency', label: 'Future Homes Project partner' },
+  // Energy Innovation Agency (super-connector)
+  { from: 'Energy Innovation Agency', to: 'GMCA', label: 'Founding partner' },
+  { from: 'Energy Innovation Agency', to: 'The Growth Company', label: 'Founding partner' },
+  { from: 'Energy Innovation Agency', to: 'Bruntwood SciTech', label: 'Founding partner' },
+  { from: 'Energy Innovation Agency', to: 'University of Manchester', label: 'Founding partner' },
+  { from: 'Energy Innovation Agency', to: 'Manchester Met University', label: 'Founding partner' },
+  { from: 'Energy Innovation Agency', to: 'University of Salford', label: 'Founding partner' },
+  // MediaCity Energy Centre
+  { from: 'MediaCity Energy Centre', to: 'MediaCityUK', label: 'Powers entire development' },
+  { from: 'MediaCity Energy Centre', to: 'BBC North', label: 'Heat & power supply' },
+  { from: 'MediaCity Energy Centre', to: 'University of Salford', label: 'Powers MediaCity campus' },
+  // Little Hulton Solar Farm
+  { from: 'Little Hulton Solar Farm', to: 'Salford City Council', label: 'Council-owned flagship' },
+  // Solar Car Ports
+  { from: 'Solar Car Ports — Turnpike House', to: 'Salford City Council', label: 'Council depot infrastructure' },
+  // Be.EV
+  { from: 'Be.EV Network', to: 'GMCA', label: 'Appointed by TfGM' },
+  { from: 'Be.EV Network', to: 'Salford City Council', label: 'Local deployment partner' },
+  // Manchester Fuel Cell Innovation Centre
+  { from: 'Manchester Fuel Cell Innovation Centre', to: 'Manchester Met University', label: 'Home institution' },
+  { from: 'Manchester Fuel Cell Innovation Centre', to: 'University of Salford', label: 'HYTECH hydrogen hub partner' },
+  { from: 'Manchester Fuel Cell Innovation Centre', to: 'University of Manchester', label: 'HYTECH hydrogen hub partner' },
+  { from: 'Manchester Fuel Cell Innovation Centre', to: 'GMCA', label: 'HYTECH partner + Innovation Accelerator' },
+  // Metrolink extension
+  { from: 'Metrolink Crescent Extension', to: 'MediaCityUK', label: 'Connects MediaCity to Crescent' },
+  { from: 'Metrolink Crescent Extension', to: 'University of Salford', label: 'Direct tram access to campus' },
+  { from: 'Metrolink Crescent Extension', to: 'Salford City Council', label: 'Planning authority' },
+  // Atom Valley
+  { from: 'Atom Valley SMMC', to: 'University of Manchester', label: 'Academic lead' },
+  { from: 'Atom Valley SMMC', to: 'GMCA', label: 'Innovation Accelerator funder' },
+  { from: 'Atom Valley SMMC', to: 'XpertRule Software', label: 'AI for sustainable manufacturing' },
+  // XpertRule green connection
+  { from: 'XpertRule Software', to: 'Energy Innovation Agency', label: 'AI for energy efficiency' },
+  // Trafford Green Hydrogen
+  { from: 'Trafford Green Hydrogen', to: 'Manchester Fuel Cell Innovation Centre', label: 'Regional hydrogen ecosystem' },
+  // MediaCity Heat Network
+  { from: 'MediaCity Heat Network (Phase 2)', to: 'MediaCityUK', label: 'Phase 2 decarbonisation' },
+];
+
+// OXIN Centres (with logos)
+const oxinCentres = [
+  { name: 'Salford Innovation Forum', lat: 53.4866, lng: -2.2726, desc: '47 businesses. Frederick Road & Seaford Road, Salford. Minutes from M60 Junction 1.', isSIF: true, logo: 'sif-logo.svg', logoW: 100 },
+  { name: 'The Wellsprings', lat: 53.5785, lng: -2.4285, desc: "Bolton's innovation hub. Creative & tech businesses. On The Wire community platform. 24/7 access.", isSIF: false, logo: 'wellsprings.svg', logoW: 90 },
+  { name: 'Stockport BIC', lat: 53.4101, lng: -2.1494, desc: 'Pioneer 10 accelerator. 4,000+ businesses supported.', isSIF: false, logo: 'sbic.svg', logoW: 80 },
+  { name: 'Merchants House', lat: 53.4096, lng: -2.1581, desc: 'Small business incubation. Stockport Market Square.', isSIF: false, logo: 'merchants.svg', logoW: 80 },
+  { name: 'Merseyway Innovation Centre', lat: 53.4113, lng: -2.1567, desc: '~50 businesses. Opened 2023. Stockport Town Centre.', isSIF: false, logo: 'merseyway.svg', logoW: 80 },
+  { name: 'Ashton Old Baths', lat: 53.4890, lng: -2.0975, desc: 'Digital/creative/tech hub. Digital Dozen accelerator. Tameside.', isSIF: false, logo: 'ashton.png', logoW: 80 },
+];
+
+// Connections
+const customerConnections = [
+  { from: 'IPEX Soft', to: 'Murphy Waldron Estates', label: 'Website development', outcome: 'SIF-brokered collaboration: IPEX Soft building Murphy Waldron\'s new digital platform' },
+  { from: 'Ready 4 Home', to: 'Ready 4 Work', label: 'Shared leadership', outcome: 'Sister organisations creating a housing-to-employment pathway across Salford' },
+];
+
+const ecosystemConnections = [
+  { from: 'NWUPC', to: 'University of Salford', label: 'Member + former host', outcome: '25 NW universities purchasing consortium managing multi-million pound frameworks' },
+  { from: 'NWUPC', to: 'University of Manchester', label: 'Member + NETpositive', outcome: 'NETpositive sustainability programme embedded in procurement' },
+  { from: 'Further Works', to: 'University of Salford', label: 'Launch@Salford + client', outcome: 'Graduate business incubated via Launch@Salford, now clients include Microsoft, NHS, Primark' },
+  { from: 'Unlimited Potential', to: 'University of Salford', label: 'Evaluation partner', outcome: 'Joint health research evaluating community programmes across Salford' },
+  { from: 'Unlimited Potential', to: 'Salford City Council', label: 'Corporate Plan embedded', outcome: 'Written into Salford\'s Corporate Plan \u2014 EU Innovation in Politics Awards finalist' },
+  { from: 'Unlimited Potential', to: 'GMCA', label: 'Foundational Economy Fund', outcome: 'GM Foundational Economy Fund supporting healthier communities at scale' },
+  { from: 'Unlimited Potential', to: 'Salford Royal Hospital', label: 'Clinical engagement', outcome: 'Community health programmes linked to NHS clinical pathways' },
+  { from: 'Inspiring Communities Together', to: 'Salford City Council', label: 'Age Friendly + housing', outcome: 'First GM Community Led Housing organisation with Registered Provider status' },
+  { from: 'Inspiring Communities Together', to: 'GMCA', label: 'Ageing in Place Pathfinder', outcome: 'Leading the GM Ageing in Place Pathfinder programme' },
+  { from: 'Inspiring Communities Together', to: 'University of Salford', label: 'Research partner' },
+  { from: 'Advocacy Focus', to: 'Salford City Council', label: "Children's Rights", outcome: 'Delivering statutory advocacy across Salford and Trafford \u2014 Mind Gold Award x4' },
+  { from: 'Rio Ferdinand Foundation', to: 'The Manchester College', label: 'Youth programme', outcome: '15,000+ young people supported into work. \u20ac1.2m PEACEPLUS EU grant secured' },
+  { from: 'A-Z Communities', to: 'Salford City Council', label: 'Digital Everyone', outcome: 'Digital inclusion partner in Salford\'s Digital Everyone programme' },
+  { from: 'Manchester City Mission', to: 'Pendleton Together', label: 'Nourish Food Club', outcome: 'Running community food clubs and support services across Pendleton' },
+  { from: 'Braiden Acoustics', to: 'University of Salford', label: 'BSc Acoustics alumnus', outcome: 'UoS graduate building consultancy alongside world-class Acoustics Research Centre' },
+  { from: 'MADE Product Development', to: 'MediaCityUK', label: 'HVPD client', outcome: '12-year SIF anchor. Electronic product design for HVPD, WCCTV, Dermalux' },
+  { from: 'Optimo', to: 'MediaCityUK', label: 'Based at Tomorrow Blue' },
+  { from: 'Qumulus', to: 'Innovate UK', label: '£350k Smart Grant', outcome: '\u00a3350k Innovate UK Smart Grant secured. Manchester Angels investor backing' },
+  { from: 'XpertRule Software', to: 'Google for Startups', label: 'Cloud Marketplace', outcome: '40-year AI company, Gartner-recognised. 70+ projects globally. Google Cloud Marketplace' },
+  { from: 'Emotional Intelligence Academy', to: 'Manchester Met University', label: 'Collaborative MSc', outcome: 'Co-owns Paul Ekman International. Collaborative MSc delivered with MMU. Featured on Discovery Channel' },
+  { from: 'Code Maze', to: 'University of Manchester', label: 'Founder ex-lecturer' },
+  { from: 'Lumine Soft', to: 'University of Manchester', label: 'Director alumnus' },
+  { from: 'Salford Supply Desk', to: 'Salford RLFC', label: 'Official partnership', outcome: 'Official partner of Salford Red Devils. REC Gold standard (top 10%)' },
+  { from: 'Manchester City Mission', to: 'HMP Forest Bank', label: 'Prison chaplaincy', outcome: 'Delivering chaplaincy and rehabilitation support at HMP Forest Bank' },
+  { from: 'Saz Media', to: 'Salford City Council', label: 'Client', outcome: 'NW Young Leader 2025. Video production for MCC, Co-op, Salford Council' },
+  { from: 'Saz Media', to: 'GMCA', label: 'Charter filming' },
+  { from: 'Big Easy Services', to: 'GMCA', label: 'ECO4 retrofit', outcome: '10 years delivering ECO scheme retrofits. TrustMark certified. Solar, heat pumps' },
+  { from: 'XN Global Systems', to: 'University of Salford', label: 'Chose Salford as HQ', outcome: 'ISO 27001 certified. Operating in 50+ countries, 7,000+ live apartments under management' },
+  { from: 'Green Chamber', to: 'MediaCityUK', label: 'Registered at MediaCity' },
+];
+
+// ==========================================
+// WEBSITE LOOKUP
+// ==========================================
+
+const websiteData = {
+  // SIF Customers
+  'XpertRule Software':             'https://www.xpertrule.com',
+  'Qumulus':                        'https://qumulus.io',
+  'XE Business':                    'https://www.xebusiness.co.uk',
+  'XN Global Systems':              'https://www.xnglobalsystems.com',
+  'Lumine Soft':                    'https://www.luminesoft.co.uk',
+  'Luwasuite':                      'https://www.luwasuite.com',
+  'MADE Product Development':       'https://www.madedevelopment.co.uk',
+  'Rio Ferdinand Foundation':       'https://www.rioferdinandfoundation.com',
+  'Unlimited Potential':            'https://www.unlimitedpotential.org.uk',
+  'Manchester City Mission':        'https://manchestercitymission.org.uk',
+  'Inspiring Communities Together': 'https://www.inspiringcommunitiestogether.org.uk',
+  'Lifeline NW CIC':                'https://www.lifelinenw.co.uk',
+  'Advocacy Focus':                 'https://www.advocacyfocus.org.uk',
+  'Emotional Intelligence Academy': 'https://www.eiainternational.co.uk',
+  'JC Academy of Finance':          'https://www.jcacademyoffinance.com',
+  'Murphy Waldron Estates':         'https://www.murphywaldron.co.uk',
+  'Big Easy Services':              'https://www.bigeasygreenergy.co.uk',
+  'U&S Investment':                 'https://www.uandsinvestment.co.uk',
+  'NWUPC':                          'https://www.nwupc.ac.uk',
+  'Braiden Acoustics':              'https://www.braidenacoustics.co.uk',
+  'Further Works':                  'https://www.furtherworks.co.uk',
+  'Saz Media':                      'https://www.sazmedia.co.uk',
+  'Salford Supply Desk':            'https://www.salfordsupplydesk.co.uk',
+  'Optimo':                         'https://www.optimodigital.co.uk',
+  'Manchester Furniture Supplies':  'https://www.manchesterfurnituresupplies.co.uk',
+  'Numlock / Continuity Shop':      'https://www.continuityshop.com',
+  'Suja Driving School':            'https://www.sujadriving.co.uk',
+  'Green Chamber':                  'https://www.greenchamber.co.uk',
+  // Ecosystem Partners
+  'University of Salford':          'https://www.salford.ac.uk',
+  'Energy House Labs':              'https://www.salford.ac.uk/research/facilities/energy-house',
+  'Launch@SalfordUni':              'https://www.salford.ac.uk/launch',
+  'OI Finance Angel Network':       'https://www.oxfordinnovation.com',
+  'English Cities Fund':            'https://www.englishcitiesfund.co.uk',
+  'MediaCityUK':                    'https://www.mediacityuk.co.uk',
+  'BBC North':                      'https://www.bbc.co.uk',
+  'ITV Granada':                    'https://www.itv.com',
+  'dock10 Studios':                 'https://www.dock10.co.uk',
+  'HOST / IN4 Group':               'https://www.in4group.co.uk',
+  'MITIH':                          'https://www.in4group.co.uk',
+  'Skills City':                    'https://www.skillscity.co.uk',
+  'The Lowry':                      'https://www.thelowry.com',
+  'Salford Royal Hospital':         'https://www.northerncarealliance.nhs.uk',
+  'Health Innovation Manchester':   'https://www.healthinnovationmanchester.com',
+  'Salford City Council':           'https://www.salford.gov.uk',
+  'GMCA':                           'https://www.greatermanchester-ca.gov.uk',
+  'University of Manchester':       'https://www.manchester.ac.uk',
+  'Manchester Met University':      'https://www.mmu.ac.uk',
+  'The Manchester College':         'https://www.themanchester.college',
+  'The Growth Company':             'https://www.growthco.uk',
+  'Innovate UK':                    'https://www.ukri.org/councils/innovate-uk',
+  'Bruntwood SciTech':              'https://www.bruntwoodscitech.com',
+  'Google for Startups':            'https://startup.google.com',
+  'Salford RLFC':                   'https://www.salfordreddevils.net',
+  'Invest Salford':                 'https://www.investsalford.co.uk',
+  'Pendleton Together':             'https://www.pendletontogether.co.uk',
+  'Ericsson':                       'https://www.ericsson.com/en/united-kingdom',
+  // OXIN Centres
+  'Salford Innovation Forum':       'https://www.salfordinnovationforum.co.uk',
+  'The Wellsprings':                'https://www.thewellsprings.co.uk',
+  'Stockport BIC':                  'https://www.stockportbic.co.uk',
+  'Merchants House':                'https://www.merchantshouse.co.uk',
+  'Merseyway Innovation Centre':    'https://www.merseyway.com',
+  'Ashton Old Baths':               'https://www.ashtonoldbaths.org.uk',
+  // Green Infrastructure
+  'Little Hulton Solar Farm':       'https://www.salford.gov.uk/your-council/news/news-archive/news-from-march-2024/salford-s-first-solar-farm-switched-on/',
+  'MediaCity Energy Centre':        'https://www.vitalenergi.co.uk/our-work/mediacityuk/',
+  'MediaCity Heat Network (Phase 2)': 'https://www.leeputilities.co.uk/mediacityuk-case-study/',
+  'Trafford Green Hydrogen':        'https://www.traffordgreenhydrogen.co.uk/',
+  'Energy House 2.0':               'https://energyhouselabs.salford.ac.uk/',
+  'Be.EV Network':                  'https://be-ev.co.uk/',
+  'Manchester Charging Oasis':      'https://be-ev.co.uk/locations/the-oasis/',
+  'Manchester Fuel Cell Innovation Centre': 'https://www.mmu.ac.uk/fuel-cell',
+  'Atom Valley SMMC':               'https://www.atom-valley.co.uk/',
+  'Energy Innovation Agency':       'https://gmgreencity.com/projects-and-campaigns/energy-innovation-agency/',
+  'Metrolink Crescent Extension':   'https://tfgm.com/',
+};
+
+// ==========================================
+// MAP INITIALIZATION
+// ==========================================
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    sources: {
+      'carto-dark': {
+        type: 'raster',
+        tiles: [
+          'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+          'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+          'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
+        ],
+        tileSize: 256,
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
+      }
+    },
+    layers: [{
+      id: 'carto-dark-layer',
+      type: 'raster',
+      source: 'carto-dark',
+      paint: {
+        'raster-saturation': -0.3,
+        'raster-brightness-min': 0.15,
+        'raster-brightness-max': 0.85,
+        'raster-contrast': 0.1
+      }
+    }]
+  },
+  center: [SIF.lng, SIF.lat],
+  zoom: 13.8,
+  minZoom: 10,
+  maxZoom: 17,
+  pitch: 0,
+  bearing: 0
+});
+
+// Add zoom controls
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+
+// ==========================================
+// ALL RENDERING VIA NATIVE MAP LAYERS (GeoJSON)
+// No DOM markers — everything rendered on the map canvas
+// for pixel-perfect positioning during pan/zoom
+// ==========================================
+
+let activeFilters = new Set(Object.keys(SECTOR_COLORS));
+let layerVisibility = { ecosystem: true, oxin: true, green: true };
+let searchTerm = '';
+let hoveredFeature = null;
+
+// Build all data into a single lookup
+const allEntities = {};
+customers.forEach(c => allEntities[c.name] = c);
+ecosystemPartners.forEach(p => allEntities[p.name] = p);
+oxinCentres.forEach(c => allEntities[c.name] = c);
+greenInfraData.forEach(g => allEntities[g.name] = g);
+
+map.on('load', () => {
+  // --- M60 Motorway Ring Road (highlighted in green) ---
+  // Approximate path tracing the M60 orbital clockwise from J1 Stockport
+  map.addSource('m60', {
+    type: 'geojson',
+    data: {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          // J1 Stockport (Portwood)
+          [-2.1530, 53.4060],
+          // J2 Cheadle Heath
+          [-2.1700, 53.3960],
+          // J3 Cheadle (A34)
+          [-2.1880, 53.3900],
+          // J4 Gatley / Cheadle Royal
+          [-2.2050, 53.3890],
+          // J5 Sale (A56)
+          [-2.2400, 53.4080],
+          // J6 Sale Water Park
+          [-2.2550, 53.4180],
+          // J7 Stretford (A56)
+          [-2.2680, 53.4380],
+          // J8 Carrington Spur
+          [-2.3000, 53.4480],
+          // J9 Trafford Park
+          [-2.3150, 53.4580],
+          // J10 Eccles (A57)
+          [-2.3350, 53.4680],
+          // J11 Peel Green / Patricroft
+          [-2.3550, 53.4750],
+          // J12 Worsley (M602)
+          [-2.3750, 53.4950],
+          // J13 Swinton / Worsley
+          [-2.3650, 53.5100],
+          // J14 Kearsley
+          [-2.3400, 53.5250],
+          // J15 Prestwich (M66)
+          [-2.3000, 53.5380],
+          // J16 Whitefield
+          [-2.2700, 53.5430],
+          // J17 Whitefield / Bury
+          [-2.2500, 53.5450],
+          // J18 Simister Island (M62/M66)
+          [-2.2200, 53.5420],
+          // J19 Middleton (A576)
+          [-2.1900, 53.5350],
+          // J20 Middleton (A664)
+          [-2.1650, 53.5280],
+          // J21 Chadderton (A663)
+          [-2.1420, 53.5180],
+          // J22 Failsworth / Oldham
+          [-2.1280, 53.5050],
+          // J23 Ashton-under-Lyne (A635)
+          [-2.1150, 53.4900],
+          // J24 Denton (A57)
+          [-2.1100, 53.4650],
+          // J25 Bredbury
+          [-2.1100, 53.4400],
+          // J26 Portwood / Stockport
+          [-2.1250, 53.4200],
+          // J27 Stockport (A626)
+          [-2.1400, 53.4100],
+          // Close back to J1
+          [-2.1530, 53.4060]
+        ]
+      },
+      properties: { name: 'M60 Motorway' }
+    }
+  });
+
+  // Glow effect under the M60
+  map.addLayer({
+    id: 'm60-glow', type: 'line', source: 'm60',
+    paint: {
+      'line-color': '#22c55e',
+      'line-width': 12,
+      'line-opacity': 0.08,
+      'line-blur': 6
+    }
+  });
+
+  // Main M60 line
+  map.addLayer({
+    id: 'm60-line', type: 'line', source: 'm60',
+    paint: {
+      'line-color': '#22c55e',
+      'line-width': 3,
+      'line-opacity': 0.5
+    }
+  });
+
+  // M60 label
+  map.addLayer({
+    id: 'm60-label', type: 'symbol', source: 'm60',
+    layout: {
+      'symbol-placement': 'line',
+      'text-field': 'M60',
+      'text-size': 11,
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      'text-letter-spacing': 0.15,
+      'symbol-spacing': 300
+    },
+    paint: {
+      'text-color': '#22c55e',
+      'text-halo-color': 'rgba(10,14,26,0.9)',
+      'text-halo-width': 2,
+      'text-opacity': 0.6
+    }
+  });
+
+  // --- Innovation Triangle (prominent) ---
+  map.addSource('innovation-triangle', {
+    type: 'geojson',
+    data: {
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[
+          [-2.2690, 53.4862],
+          [-2.2975, 53.4726],
+          [-2.3252, 53.4874],
+          [-2.2690, 53.4862]
+        ]]
+      }
+    }
+  });
+  // Visible fill
+  map.addLayer({
+    id: 'triangle-fill', type: 'fill', source: 'innovation-triangle',
+    paint: { 'fill-color': '#00e5cc', 'fill-opacity': 0.06 }
+  });
+  // Glow edge
+  map.addLayer({
+    id: 'triangle-glow', type: 'line', source: 'innovation-triangle',
+    paint: { 'line-color': '#00e5cc', 'line-opacity': 0.12, 'line-width': 10, 'line-blur': 6 }
+  });
+  // Crisp dashed edge
+  map.addLayer({
+    id: 'triangle-line', type: 'line', source: 'innovation-triangle',
+    paint: { 'line-color': '#00e5cc', 'line-opacity': 0.4, 'line-width': 2, 'line-dasharray': [6, 4] }
+  });
+  // Triangle label — "SALFORD INNOVATION TRIANGLE"
+  map.addSource('triangle-label-point', {
+    type: 'geojson',
+    data: { type: 'Feature', geometry: { type: 'Point', coordinates: [-2.2970, 53.4820] }, properties: {} }
+  });
+  map.addLayer({
+    id: 'triangle-label', type: 'symbol', source: 'triangle-label-point',
+    layout: {
+      'text-field': 'SALFORD INNOVATION TRIANGLE',
+      'text-size': 10,
+      'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+      'text-letter-spacing': 0.2,
+      'text-allow-overlap': true
+    },
+    paint: {
+      'text-color': 'rgba(78,205,196,0.3)',
+      'text-halo-color': 'rgba(10,14,26,0.8)',
+      'text-halo-width': 2
+    }
+  });
+
+  // --- OXIN network connection lines ---
+  const sifC = oxinCentres.find(c => c.isSIF);
+  const oxinLines = { type: 'FeatureCollection', features: oxinCentres.filter(c => !c.isSIF).map(c => ({
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: [[sifC.lng, sifC.lat], [c.lng, c.lat]] },
+    properties: { from: sifC.name, to: c.name }
+  }))};
+  map.addSource('oxin-lines', { type: 'geojson', data: oxinLines });
+  map.addLayer({
+    id: 'oxin-lines-layer', type: 'line', source: 'oxin-lines',
+    paint: { 'line-color': 'rgba(150,130,255,0.2)', 'line-width': 1, 'line-dasharray': [2, 4] }
+  });
+
+  // --- Ecosystem connection lines (visible on hover) ---
+  const ecoLineFeatures = ecosystemConnections.map(conn => {
+    const from = customers.find(c => c.name === conn.from);
+    const to = ecosystemPartners.find(p => p.name === conn.to);
+    if (!from || !to) return null;
+    return {
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: [[from.lng, from.lat], [to.lng, to.lat]] },
+      properties: { from: conn.from, to: conn.to, label: conn.label }
+    };
+  }).filter(Boolean);
+  map.addSource('eco-lines', { type: 'geojson', data: { type: 'FeatureCollection', features: ecoLineFeatures }});
+  // Subtle default visibility — brighter on hover
+  map.addLayer({
+    id: 'eco-lines-layer', type: 'line', source: 'eco-lines',
+    paint: { 'line-color': 'rgba(255,170,100,0.4)', 'line-width': 1, 'line-dasharray': [4, 3], 'line-opacity': 0.12 }
+  });
+
+  // --- Customer connection lines (subtle default, bright on hover) ---
+  const custLineFeatures = customerConnections.map(conn => {
+    const from = customers.find(c => c.name === conn.from);
+    const to = customers.find(c => c.name === conn.to);
+    if (!from || !to) return null;
+    return {
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: [[from.lng, from.lat], [to.lng, to.lat]] },
+      properties: { from: conn.from, to: conn.to, label: conn.label }
+    };
+  }).filter(Boolean);
+  map.addSource('cust-lines', { type: 'geojson', data: { type: 'FeatureCollection', features: custLineFeatures }});
+  map.addLayer({
+    id: 'cust-lines-layer', type: 'line', source: 'cust-lines',
+    paint: { 'line-color': 'rgba(78,205,196,0.5)', 'line-width': 1.5, 'line-opacity': 0.15 }
+  });
+
+  // --- OXIN Centre points (GeoJSON for glow + lines, HTML markers for logos) ---
+  const oxinFeatures = oxinCentres.map(c => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
+    properties: { name: c.name, isSIF: c.isSIF, desc: c.desc, type: 'oxin' }
+  }));
+  map.addSource('oxin-centres', { type: 'geojson', data: { type: 'FeatureCollection', features: oxinFeatures }});
+
+  // SIF outer glow
+  map.addLayer({
+    id: 'sif-glow-outer', type: 'circle', source: 'oxin-centres',
+    filter: ['==', ['get', 'isSIF'], true],
+    paint: { 'circle-radius': 50, 'circle-color': '#00e5cc', 'circle-opacity': 0.06, 'circle-blur': 1 }
+  });
+  // SIF inner glow
+  map.addLayer({
+    id: 'sif-glow', type: 'circle', source: 'oxin-centres',
+    filter: ['==', ['get', 'isSIF'], true],
+    paint: { 'circle-radius': 30, 'circle-color': '#00e5cc', 'circle-opacity': 0.15, 'circle-blur': 0.8 }
+  });
+
+  // OXIN centres: HTML markers with logos (GPU-accelerated for smooth panning)
+  window.oxinMarkerEls = [];
+  oxinCentres.forEach(centre => {
+    const el = document.createElement('div');
+    el.className = 'oxin-marker' + (centre.isSIF ? ' sif-marker' : '');
+
+    const img = document.createElement('img');
+    img.src = centre.logo;
+    img.alt = centre.name;
+    el.appendChild(img);
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const card = document.getElementById('infoCard');
+      const color = centre.isSIF ? '#00e5cc' : '#9682ff';
+      document.getElementById('infoSector').textContent = 'Oxford Innovation Space';
+      document.getElementById('infoSector').style.background = color + '20';
+      document.getElementById('infoSector').style.color = color;
+      document.getElementById('infoName').textContent = centre.name;
+      document.getElementById('infoType').textContent = 'OXIN Centre';
+      document.getElementById('infoDesc').textContent = centre.desc;
+      document.getElementById('infoConnTitle').style.display = 'none';
+      document.getElementById('infoConnections').innerHTML = '';
+      let left = e.clientX + 15;
+      let top = e.clientY - 20;
+      if (left + 340 > window.innerWidth) left = e.clientX - 335;
+      if (top + 300 > window.innerHeight) top = window.innerHeight - 320;
+      if (top < 80) top = 80;
+      card.style.left = left + 'px';
+      card.style.top = top + 'px';
+      card.classList.add('visible');
+    });
+
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([centre.lng, centre.lat])
+      .addTo(map);
+
+    window.oxinMarkerEls.push({ marker, element: el, data: centre });
+  });
+
+  // --- Ecosystem partner points ---
+  const ecoFeatures = ecosystemPartners.map(p => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+    properties: { name: p.name, desc: p.desc, size: p.size, type: 'ecosystem' }
+  }));
+  map.addSource('ecosystem', { type: 'geojson', data: { type: 'FeatureCollection', features: ecoFeatures }});
+
+  // Eco glow for large partners
+  map.addLayer({
+    id: 'eco-glow', type: 'circle', source: 'ecosystem',
+    filter: ['==', ['get', 'size'], 'large'],
+    paint: {
+      'circle-radius': 16,
+      'circle-color': 'rgba(255,170,100,0.15)',
+      'circle-blur': 0.8
+    }
+  });
+  map.addLayer({
+    id: 'eco-circles', type: 'circle', source: 'ecosystem',
+    paint: {
+      'circle-radius': ['match', ['get', 'size'], 'large', 9, 'medium', 6, 4],
+      'circle-color': 'rgba(255,170,100,0.75)',
+      'circle-stroke-width': ['match', ['get', 'size'], 'large', 2, 1],
+      'circle-stroke-color': 'rgba(255,170,100,0.3)'
+    }
+  });
+  map.addLayer({
+    id: 'eco-labels', type: 'symbol', source: 'ecosystem',
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-size': ['match', ['get', 'size'], 'large', 12, 'medium', 9.5, 8],
+      'text-font': ['match', ['get', 'size'],
+        'large', ['literal', ['Open Sans Bold', 'Arial Unicode MS Bold']],
+        ['literal', ['Open Sans Semibold', 'Arial Unicode MS Regular']]
+      ],
+      'text-offset': [0, 1.4],
+      'text-anchor': 'top',
+      'text-allow-overlap': ['step', ['zoom'], false, 12, ['==', ['get', 'size'], 'large']],
+      'text-optional': ['match', ['get', 'size'], 'large', false, true]
+    },
+    paint: {
+      'text-color': ['match', ['get', 'size'], 'large', 'rgba(255,180,110,0.85)', 'rgba(255,170,100,0.6)'],
+      'text-halo-color': 'rgba(10,14,26,0.95)',
+      'text-halo-width': 2.5
+    }
+  });
+
+  // --- Green Infrastructure layer ---
+  const greenFeatures = greenInfraData.map(g => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [g.lng, g.lat] },
+    properties: { name: g.name, desc: g.desc, subsector: g.subsector, status: g.status, size: g.size, type: 'green' }
+  }));
+  map.addSource('green-infra', { type: 'geojson', data: { type: 'FeatureCollection', features: greenFeatures }});
+
+  // Green infra glow for large nodes
+  map.addLayer({
+    id: 'green-glow', type: 'circle', source: 'green-infra',
+    filter: ['==', ['get', 'size'], 'large'],
+    paint: { 'circle-radius': 18, 'circle-color': 'rgba(74,222,128,0.15)', 'circle-blur': 0.8 }
+  });
+  // Green infra circles
+  map.addLayer({
+    id: 'green-circles', type: 'circle', source: 'green-infra',
+    paint: {
+      'circle-radius': ['match', ['get', 'size'], 'large', 9, 'medium', 6, 4],
+      'circle-color': GREEN_COLOR,
+      'circle-stroke-width': ['match', ['get', 'size'], 'large', 2, 1],
+      'circle-stroke-color': 'rgba(74,222,128,0.3)'
+    }
+  });
+  // Green infra labels
+  map.addLayer({
+    id: 'green-labels', type: 'symbol', source: 'green-infra',
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-size': ['match', ['get', 'size'], 'large', 12, 'medium', 9.5, 8],
+      'text-font': ['match', ['get', 'size'],
+        'large', ['literal', ['Open Sans Bold', 'Arial Unicode MS Bold']],
+        ['literal', ['Open Sans Semibold', 'Arial Unicode MS Regular']]
+      ],
+      'text-offset': [0, 1.4],
+      'text-anchor': 'top',
+      'text-allow-overlap': ['step', ['zoom'], false, 12, ['==', ['get', 'size'], 'large']],
+      'text-optional': ['match', ['get', 'size'], 'large', false, true]
+    },
+    paint: {
+      'text-color': ['match', ['get', 'size'], 'large', 'rgba(74,222,128,0.85)', 'rgba(74,222,128,0.6)'],
+      'text-halo-color': 'rgba(10,14,26,0.95)',
+      'text-halo-width': 2.5
+    }
+  });
+
+  // --- Green infrastructure connection lines ---
+  const greenLineFeatures = greenConnections.map(conn => {
+    const from = allEntities[conn.from];
+    const to = allEntities[conn.to];
+    if (!from || !to) return null;
+    return {
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: [[from.lng, from.lat], [to.lng, to.lat]] },
+      properties: { from: conn.from, to: conn.to, label: conn.label }
+    };
+  }).filter(Boolean);
+  map.addSource('green-lines', { type: 'geojson', data: { type: 'FeatureCollection', features: greenLineFeatures }});
+  map.addLayer({
+    id: 'green-lines-layer', type: 'line', source: 'green-lines',
+    paint: { 'line-color': 'rgba(74,222,128,0.4)', 'line-width': 1, 'line-dasharray': [6, 3], 'line-opacity': 0.12 }
+  });
+
+  // --- Customer points (the 47 businesses) ---
+  const custFeatures = customers.map(c => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
+    properties: { name: c.name, sector: c.sector, desc: c.desc, stage: c.stage, strength: c.strength, founded: c.founded, type: 'customer' }
+  }));
+  map.addSource('customers', { type: 'geojson', data: { type: 'FeatureCollection', features: custFeatures }});
+
+  // Glow for strong nodes
+  map.addLayer({
+    id: 'cust-glow', type: 'circle', source: 'customers',
+    filter: ['>=', ['get', 'strength'], 4],
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['get', 'strength'], 4, 14, 5, 18],
+      'circle-color': ['match', ['get', 'sector'],
+        'Technology & Software', '#00d4aa',
+        'Charity & Social Enterprise', '#ff6b9d',
+        'Education & Training', '#ffd93d',
+        'Professional Services', '#67b8f0',
+        'Creative & Media', '#ff8c42',
+        'Retail & E-commerce', '#a78bfa',
+        '#94a3b8'
+      ],
+      'circle-opacity': 0.15,
+      'circle-blur': 1
+    }
+  });
+
+  // Main circles
+  map.addLayer({
+    id: 'cust-circles', type: 'circle', source: 'customers',
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['get', 'strength'], 1, 4, 2, 5, 3, 7, 4, 9, 5, 11],
+      'circle-color': ['match', ['get', 'sector'],
+        'Technology & Software', '#00d4aa',
+        'Charity & Social Enterprise', '#ff6b9d',
+        'Education & Training', '#ffd93d',
+        'Health, Care & Wellbeing', '#6bcb77',
+        'Real Estate & Property', '#c084fc',
+        'Professional Services', '#67b8f0',
+        'Creative & Media', '#ff8c42',
+        'Employment Support', '#f87171',
+        'Retail & E-commerce', '#a78bfa',
+        'Marketing', '#fb923c',
+        '#94a3b8'
+      ],
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': 'rgba(0,0,0,0.3)',
+      'circle-opacity': 0.9
+    }
+  });
+
+  // Customer labels (only strong ones at default zoom, more on zoom in)
+  map.addLayer({
+    id: 'cust-labels', type: 'symbol', source: 'customers',
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 13, 8, 16, 11],
+      'text-font': ['Open Sans Semibold', 'Arial Unicode MS Regular'],
+      'text-offset': [0, 1.2],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true,
+      'symbol-sort-key': ['*', -1, ['get', 'strength']]
+    },
+    paint: {
+      'text-color': ['match', ['get', 'sector'],
+        'Technology & Software', '#00d4aa',
+        'Charity & Social Enterprise', '#ff6b9d',
+        'Education & Training', '#ffd93d',
+        'Health, Care & Wellbeing', '#6bcb77',
+        'Real Estate & Property', '#c084fc',
+        'Professional Services', '#67b8f0',
+        'Creative & Media', '#ff8c42',
+        'Employment Support', '#f87171',
+        'Retail & E-commerce', '#a78bfa',
+        'Marketing', '#fb923c',
+        '#94a3b8'
+      ],
+      'text-halo-color': 'rgba(10,14,26,0.9)',
+      'text-halo-width': 2,
+      'text-opacity': ['step', ['get', 'strength'], 0, 3, 0.6, 4, 0.8, 5, 1]
+    }
+  });
+
+  // --- Interactivity ---
+  // Popup on click for any circle layer
+  const clickableLayers = ['cust-circles', 'eco-circles', 'oxin-circles', 'green-circles'];
+
+  clickableLayers.forEach(layerId => {
+    map.on('click', layerId, (e) => {
+      if (!e.features.length) return;
+      const props = e.features[0].properties;
+      const name = props.name;
+      const entity = allEntities[name];
+      if (!entity) return;
+
+      const card = document.getElementById('infoCard');
+      const sectorOrType = entity.sector || (props.type === 'green' ? 'Green Infrastructure' : props.type === 'ecosystem' ? 'Ecosystem Partner' : props.type === 'oxin' ? 'OXIN Centre' : '');
+      const color = SECTOR_COLORS[sectorOrType] || (props.type === 'green' ? GREEN_COLOR : props.type === 'ecosystem' ? '#ffaa64' : props.type === 'oxin' ? '#00e5cc' : '#94a3b8');
+
+      document.getElementById('infoSector').textContent = sectorOrType;
+      document.getElementById('infoSector').style.background = color + '20';
+      document.getElementById('infoSector').style.color = color;
+      document.getElementById('infoName').textContent = name;
+      document.getElementById('infoType').textContent = entity.stage ? `${entity.stage} | Founded ${entity.founded}` : (entity.subsector ? `${entity.subsector} | ${entity.status}` : entity.isSIF !== undefined ? 'OXIN Centre' : 'Ecosystem Partner');
+      document.getElementById('infoDesc').textContent = entity.desc;
+
+      const connections = [
+        ...customerConnections.filter(c => c.from === name || c.to === name)
+          .map(c => ({ name: c.from === name ? c.to : c.from, label: c.label, outcome: c.outcome })),
+        ...ecosystemConnections.filter(c => c.from === name || c.to === name)
+          .map(c => ({ name: c.from === name ? c.to : c.from, label: c.label, outcome: c.outcome })),
+        ...greenConnections.filter(c => c.from === name || c.to === name)
+          .map(c => ({ name: c.from === name ? c.to : c.from, label: c.label, outcome: c.outcome }))
+      ];
+      const connDiv = document.getElementById('infoConnections');
+      const connTitle = document.getElementById('infoConnTitle');
+      if (connections.length > 0) {
+        connTitle.style.display = 'block';
+        connDiv.innerHTML = connections.map(c =>
+          `<div class="info-card-connection">${c.name} <span style="color:rgba(255,255,255,0.3)">\u2014 ${c.label}</span>${c.outcome ? `<div class="info-card-outcome">${c.outcome}</div>` : ''}</div>`
+        ).join('');
+      } else {
+        connTitle.style.display = 'none';
+        connDiv.innerHTML = '';
+      }
+
+      let left = e.originalEvent.clientX + 15;
+      let top = e.originalEvent.clientY - 20;
+      if (left + 340 > window.innerWidth) left = e.originalEvent.clientX - 335;
+      if (top + 300 > window.innerHeight) top = window.innerHeight - 320;
+      if (top < 80) top = 80;
+      card.style.left = left + 'px';
+      card.style.top = top + 'px';
+      card.classList.add('visible');
+    });
+
+    map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+  });
+
+  // Hover to show connections + tooltip
+  const tooltip = document.getElementById('hoverTooltip');
+
+  function getInitials(name) {
+    const words = name.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+
+  function showHoverTooltip(name, x, y) {
+    const entity = allEntities[name];
+    if (!entity) return;
+
+    const sectorOrType = entity.sector || (entity.subsector ? entity.subsector : entity.isSIF !== undefined ? 'OXIN Centre' : 'Ecosystem Partner');
+    const color = SECTOR_COLORS[sectorOrType] || GREEN_SUBSECTORS[sectorOrType] || (entity.subsector ? GREEN_COLOR : entity.isSIF !== undefined ? '#00e5cc' : '#ffaa64');
+
+    // Logo placeholder
+    const logoEl = document.getElementById('hoverLogo');
+    logoEl.textContent = getInitials(name);
+    logoEl.style.background = color;
+
+    document.getElementById('hoverName').textContent = name;
+    const sectorEl = document.getElementById('hoverSector');
+    sectorEl.textContent = sectorOrType;
+    sectorEl.style.color = color;
+
+    // Description
+    document.getElementById('hoverDesc').textContent = entity.desc || '';
+
+    // Collaborations
+    const connections = [
+      ...customerConnections.filter(c => c.from === name || c.to === name)
+        .map(c => ({ name: c.from === name ? c.to : c.from, label: c.label, outcome: c.outcome })),
+      ...ecosystemConnections.filter(c => c.from === name || c.to === name)
+        .map(c => ({ name: c.from === name ? c.to : c.from, label: c.label, outcome: c.outcome })),
+      ...greenConnections.filter(c => c.from === name || c.to === name)
+        .map(c => ({ name: c.from === name ? c.to : c.from, label: c.label, outcome: c.outcome }))
+    ];
+    const collabsEl = document.getElementById('hoverCollabs');
+    if (connections.length > 0) {
+      collabsEl.innerHTML = '<div class="hover-tooltip-collab-title">Collaborations</div>' +
+        connections.slice(0, 3).map(c => `<div class="hover-tooltip-collab">${c.name} \u2014 ${c.label}</div>`).join('') +
+        (connections.length > 3 ? `<div style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:4px;padding-left:10px">+${connections.length - 3} more \u2014 click for details</div>` : '');
+    } else {
+      collabsEl.innerHTML = '';
+    }
+
+    // Website link
+    const websiteEl = document.getElementById('hoverWebsite');
+    const url = websiteData[name];
+    if (url) {
+      websiteEl.textContent = url.replace('https://www.', '').replace('https://', '') + ' \u2197';
+      websiteEl.href = url;
+      websiteEl.style.display = 'block';
+    } else {
+      websiteEl.style.display = 'none';
+    }
+
+    let left = x + 16;
+    let top = y - 10;
+    if (left + 296 > window.innerWidth) left = x - 292;
+    if (top < 70) top = 70;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+    tooltip.classList.add('visible');
+  }
+
+  ['cust-circles', 'eco-circles', 'green-circles'].forEach(layerId => {
+    map.on('mouseenter', layerId, (e) => {
+      if (!e.features.length) return;
+      const name = e.features[0].properties.name;
+      hoveredFeature = name;
+      showConnectionsFor(name);
+      showHoverTooltip(name, e.originalEvent.clientX, e.originalEvent.clientY);
+    });
+    map.on('mousemove', layerId, (e) => {
+      if (!e.features.length) return;
+      const name = e.features[0].properties.name;
+      if (name !== hoveredFeature) {
+        hoveredFeature = name;
+        showConnectionsFor(name);
+        showHoverTooltip(name, e.originalEvent.clientX, e.originalEvent.clientY);
+      } else {
+        let left = e.originalEvent.clientX + 16;
+        let top = e.originalEvent.clientY - 10;
+        if (left + 260 > window.innerWidth) left = e.originalEvent.clientX - 256;
+        if (top < 70) top = 70;
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+      }
+    });
+    map.on('mouseleave', layerId, () => {
+      hoveredFeature = null;
+      hideConnections();
+      tooltip.classList.remove('visible');
+    });
+  });
+
+  // Close card on map click (not on feature)
+  map.on('click', (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: clickableLayers });
+    if (features.length === 0) {
+      document.getElementById('infoCard').classList.remove('visible');
+    }
+  });
+
+  buildFilterPanel();
+  setupSearch();
+  setupFullscreen();
+  setupIntroAndHelp();
+  setupTableView();
+
+  // --- Guided Tour / Present Mode ---
+  setupTour();
+});
+
+function setupIntroAndHelp() {
+  const intro = document.getElementById('introOverlay');
+  const help = document.getElementById('helpOverlay');
+
+  document.getElementById('introEnter').addEventListener('click', () => {
+    intro.classList.add('hidden');
+    setTimeout(() => { intro.style.display = 'none'; }, 600);
+  });
+
+  document.getElementById('introHow').addEventListener('click', () => {
+    intro.classList.add('hidden');
+    setTimeout(() => {
+      intro.style.display = 'none';
+      help.classList.add('visible');
+    }, 300);
+  });
+
+  document.getElementById('helpBtn').addEventListener('click', () => {
+    help.classList.add('visible');
+  });
+
+  document.getElementById('helpClose').addEventListener('click', () => {
+    help.classList.remove('visible');
+  });
+
+  // Close help on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (help.classList.contains('visible')) help.classList.remove('visible');
+      if (!intro.classList.contains('hidden')) {
+        intro.classList.add('hidden');
+        setTimeout(() => { intro.style.display = 'none'; }, 600);
+      }
+    }
+  });
+}
+
+function showConnectionsFor(name) {
+  // Brighten connected lines, dim others
+  const matchExpr = ['any', ['==', ['get', 'from'], name], ['==', ['get', 'to'], name]];
+  map.setPaintProperty('eco-lines-layer', 'line-opacity', ['case', matchExpr, 0.7, 0.04]);
+  map.setPaintProperty('eco-lines-layer', 'line-width', ['case', matchExpr, 2.5, 1]);
+  map.setPaintProperty('cust-lines-layer', 'line-opacity', ['case', matchExpr, 0.8, 0.05]);
+  map.setPaintProperty('cust-lines-layer', 'line-width', ['case', matchExpr, 3, 1.5]);
+  map.setPaintProperty('green-lines-layer', 'line-opacity', ['case', matchExpr, 0.7, 0.04]);
+  map.setPaintProperty('green-lines-layer', 'line-width', ['case', matchExpr, 2.5, 1]);
+}
+
+function hideConnections() {
+  map.setPaintProperty('eco-lines-layer', 'line-opacity', 0.12);
+  map.setPaintProperty('eco-lines-layer', 'line-width', 1);
+  map.setPaintProperty('cust-lines-layer', 'line-opacity', 0.15);
+  map.setPaintProperty('cust-lines-layer', 'line-width', 1.5);
+  map.setPaintProperty('green-lines-layer', 'line-opacity', 0.12);
+  map.setPaintProperty('green-lines-layer', 'line-width', 1);
+}
+
+// ==========================================
+// FILTERS
+// ==========================================
+
+function buildFilterPanel() {
+  const panel = document.getElementById('filterPanel');
+
+  // --- Sectors section ---
+  let html = '<button class="tour-panel-btn" id="tourBtn"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg> Explore the Ecosystem</button>';
+  html += '<div class="layer-divider"></div>';
+  html += '<div class="layer-section"><div class="filter-title">Sectors</div>';
+  html += '<div class="toggle-all-row">';
+  html += '<button class="toggle-all-btn" id="showAllSectors">Show All</button>';
+  html += '<button class="toggle-all-btn" id="hideAllSectors">Hide All</button>';
+  html += '</div>';
+
+  Object.keys(SECTOR_COLORS).forEach(sector => {
+    const count = customers.filter(c => c.sector === sector).length;
+    html += `<button class="filter-btn" data-sector="${sector}">
+      <span class="filter-dot" style="background:${SECTOR_COLORS[sector]}"></span>
+      ${sector}
+      <span class="filter-count">${count}</span>
+    </button>`;
+  });
+
+  // --- Eco-System section ---
+  html += '</div><div class="layer-divider"></div>';
+  html += '<div class="layer-section"><div class="filter-title">Eco-System</div>';
+  html += '<div class="toggle-all-row">';
+  html += '<button class="toggle-all-btn" id="showAllEco">Show All</button>';
+  html += '<button class="toggle-all-btn" id="hideAllEco">Hide All</button>';
+  html += '</div>';
+  html += '<button class="filter-btn" data-layer="ecosystem"><span class="filter-dot" style="background:#ffaa64"></span>Ecosystem Partners</button>';
+  html += '<button class="filter-btn" data-layer="green"><span class="filter-dot" style="background:#4ade80"></span>Green Infrastructure<span class="filter-count">' + greenInfraData.length + '</span></button>';
+  html += '<button class="filter-btn" data-layer="oxin"><span class="filter-dot" style="background:#9682ff"></span>Oxford Innovation GM</button>';
+  html += '</div>';
+  html += '<div class="layer-divider"></div>';
+  html += '<a class="filter-cta" href="https://www.salfordinnovationforum.co.uk/contact/" target="_blank" rel="noopener">';
+  html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+  html += 'Add your business to the map</a>';
+
+  panel.innerHTML = html;
+
+  // --- Sector toggle events ---
+  panel.querySelectorAll('[data-sector]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sector = btn.dataset.sector;
+      if (activeFilters.has(sector)) {
+        activeFilters.delete(sector);
+        btn.classList.add('inactive');
+      } else {
+        activeFilters.add(sector);
+        btn.classList.remove('inactive');
+      }
+      applyFilters();
+    });
+  });
+
+  document.getElementById('showAllSectors').addEventListener('click', () => {
+    Object.keys(SECTOR_COLORS).forEach(s => activeFilters.add(s));
+    panel.querySelectorAll('[data-sector]').forEach(b => b.classList.remove('inactive'));
+    applyFilters();
+  });
+
+  document.getElementById('hideAllSectors').addEventListener('click', () => {
+    activeFilters.clear();
+    panel.querySelectorAll('[data-sector]').forEach(b => b.classList.add('inactive'));
+    applyFilters();
+  });
+
+  // --- Eco-system layer toggle events ---
+  function setEcosystemVisibility(visible) {
+    layerVisibility.ecosystem = visible;
+    const v = visible ? 'visible' : 'none';
+    map.setLayoutProperty('eco-circles', 'visibility', v);
+    map.setLayoutProperty('eco-labels', 'visibility', v);
+    map.setLayoutProperty('eco-lines-layer', 'visibility', v);
+    const ecoBtn = panel.querySelector('[data-layer="ecosystem"]');
+    if (ecoBtn) ecoBtn.classList.toggle('inactive', !visible);
+  }
+
+  function setOxinVisibility(visible) {
+    layerVisibility.oxin = visible;
+    const v = visible ? 'visible' : 'none';
+    ['oxin-lines-layer', 'sif-glow', 'sif-glow-outer'].forEach(id => {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v);
+    });
+    window.oxinMarkerEls.forEach(m => { m.element.style.display = visible ? '' : 'none'; });
+    const oxinBtn = panel.querySelector('[data-layer="oxin"]');
+    if (oxinBtn) oxinBtn.classList.toggle('inactive', !visible);
+  }
+
+  function setGreenVisibility(visible) {
+    layerVisibility.green = visible;
+    const v = visible ? 'visible' : 'none';
+    ['green-circles', 'green-labels', 'green-glow', 'green-lines-layer'].forEach(id => {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v);
+    });
+    const greenBtn = panel.querySelector('[data-layer="green"]');
+    if (greenBtn) greenBtn.classList.toggle('inactive', !visible);
+  }
+
+  panel.querySelectorAll('[data-layer]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const layer = btn.dataset.layer;
+      if (layer === 'ecosystem') {
+        setEcosystemVisibility(!layerVisibility.ecosystem);
+      } else if (layer === 'green') {
+        setGreenVisibility(!layerVisibility.green);
+      } else {
+        setOxinVisibility(!layerVisibility.oxin);
+      }
+    });
+  });
+
+  document.getElementById('showAllEco').addEventListener('click', () => {
+    setEcosystemVisibility(true);
+    setGreenVisibility(true);
+    setOxinVisibility(true);
+  });
+
+  document.getElementById('hideAllEco').addEventListener('click', () => {
+    setEcosystemVisibility(false);
+    setGreenVisibility(false);
+    setOxinVisibility(false);
+  });
+}
+
+function applyFilters() {
+  // Build filter expression: show if sector is in activeFilters AND matches search
+  const sectorList = [...activeFilters];
+  let filter;
+  if (sectorList.length === Object.keys(SECTOR_COLORS).length && !searchTerm) {
+    filter = null; // show all
+  } else {
+    const conditions = [['in', ['get', 'sector'], ['literal', sectorList]]];
+    if (searchTerm) {
+      // MapLibre doesn't have native "contains" — use a workaround with case-insensitive by checking name
+      // We'll filter on the JS side and update the source instead
+    }
+    filter = conditions.length === 1 ? conditions[0] : ['all', ...conditions];
+  }
+
+  if (searchTerm) {
+    // Rebuild customer source with filtered data
+    const filtered = customers.filter(c =>
+      activeFilters.has(c.sector) && c.name.toLowerCase().includes(searchTerm)
+    );
+    updateCustomerSource(filtered);
+  } else if (filter) {
+    updateCustomerSource(customers.filter(c => activeFilters.has(c.sector)));
+  } else {
+    updateCustomerSource(customers);
+  }
+}
+
+function updateCustomerSource(data) {
+  const features = data.map(c => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
+    properties: { name: c.name, sector: c.sector, desc: c.desc, stage: c.stage, strength: c.strength, founded: c.founded, type: 'customer' }
+  }));
+  map.getSource('customers').setData({ type: 'FeatureCollection', features });
+}
+
+// ==========================================
+// SEARCH & FULLSCREEN
+// ==========================================
+
+function setupSearch() {
+  const input = document.getElementById('searchInput');
+  const dropdown = document.getElementById('searchDropdown');
+
+  input.addEventListener('input', (e) => {
+    searchTerm = e.target.value.toLowerCase().trim();
+    applyFilters();
+    updateSearchDropdown();
+  });
+
+  input.addEventListener('focus', () => {
+    if (searchTerm) updateSearchDropdown();
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#searchBox')) {
+      dropdown.classList.remove('visible');
+    }
+  });
+
+  function updateSearchDropdown() {
+    if (!searchTerm) {
+      dropdown.classList.remove('visible');
+      return;
+    }
+
+    const allSearchable = [...customers, ...ecosystemPartners, ...greenInfraData];
+    const matches = allSearchable.filter(c =>
+      c.name.toLowerCase().includes(searchTerm)
+    ).slice(0, 8);
+
+    if (matches.length > 0) {
+      dropdown.innerHTML = matches.map(m => {
+        const color = SECTOR_COLORS[m.sector] || (m.subsector ? GREEN_COLOR : '#ffaa64');
+        const sectorLabel = m.sector || m.subsector || 'Ecosystem';
+        return `<div class="search-result" data-name="${m.name}" data-lng="${m.lng}" data-lat="${m.lat}">
+          <span class="search-result-dot" style="background:${color}"></span>
+          ${m.name}
+          <span class="search-result-sector">${sectorLabel}</span>
+        </div>`;
+      }).join('');
+
+      // Click to fly to result
+      dropdown.querySelectorAll('.search-result').forEach(el => {
+        el.addEventListener('click', () => {
+          const lng = parseFloat(el.dataset.lng);
+          const lat = parseFloat(el.dataset.lat);
+          map.flyTo({ center: [lng, lat], zoom: 15.5, duration: 1200 });
+          input.value = el.dataset.name;
+          searchTerm = '';
+          applyFilters();
+          dropdown.classList.remove('visible');
+        });
+      });
+    } else {
+      dropdown.innerHTML = `<div class="search-no-results">
+        <div class="search-no-results-text">No business found for "${input.value}"</div>
+        <a class="search-cta" href="https://www.salfordinnovationforum.co.uk/contact/" target="_blank" rel="noopener">
+          Add your business to the map
+        </a>
+      </div>`;
+    }
+
+    dropdown.classList.add('visible');
+  }
+}
+
+function setupFullscreen() {
+  document.getElementById('fullscreenBtn').addEventListener('click', () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen();
+    }
+  });
+
+  document.getElementById('infoCardClose').addEventListener('click', () => {
+    document.getElementById('infoCard').classList.remove('visible');
+  });
+}
+
+// ==========================================
+// GUIDED TOUR / PRESENT MODE
+// ==========================================
+
+function setupTour() {
+  const tourStops = [
+    {
+      step: 'Welcome',
+      title: 'Your Future Home in Salford',
+      desc: 'Salford Innovation Forum is more than office space — it\'s a launchpad into Greater Manchester\'s most connected innovation ecosystem. Let us show you what you\'ll be part of.',
+      stats: [
+        { val: '47', lbl: 'Businesses' },
+        { val: '11', lbl: 'Sectors' },
+        { val: '35+', lbl: 'Ecosystem Partners' }
+      ],
+      fly: { center: [SIF.lng, SIF.lat], zoom: 14.5, duration: 2000, pitch: 0 }
+    },
+    {
+      step: 'The Innovation Triangle',
+      title: 'Three World-Class Institutions. One Postcode.',
+      desc: 'SIF sits inside the Salford Innovation Triangle — connecting you directly to the University of Salford, MediaCityUK, and Salford Royal Hospital. Research, media, health — all within walking distance.',
+      stats: [
+        { val: '23,000', lbl: 'UoS Students' },
+        { val: '3,000+', lbl: 'BBC Staff' },
+        { val: '20,000', lbl: 'NHS Staff' }
+      ],
+      fly: { center: [-2.2950, 53.4810], zoom: 13.2, duration: 2500, pitch: 0 }
+    },
+    {
+      step: 'MediaCityUK',
+      title: 'BBC. ITV. dock10. 250+ Creative & Tech Businesses.',
+      desc: 'MediaCityUK is doubling in size with £750m of new development. HOME to BBC North, ITV Granada, HOST innovation hub, and the UK\'s leading immersive tech accelerator (MITIH). Your neighbours\' clients.',
+      stats: [
+        { val: '250+', lbl: 'Businesses' },
+        { val: '£750m', lbl: 'Phase 2 Investment' },
+        { val: '850k', lbl: 'Lowry Visitors/yr' }
+      ],
+      fly: { center: [-2.2975, 53.4726], zoom: 15, duration: 2000, pitch: 30 }
+    },
+    {
+      step: 'University of Salford',
+      title: 'Research. Talent. Innovation Labs.',
+      desc: 'NERIC for robotics. Energy House Labs for net-zero housing. Launch@Salford for startup incubation. The Acoustics Research Centre with 60+ years of world-class research. Your R&D department next door.',
+      stats: [
+        { val: '£16m', lbl: 'NERIC Investment' },
+        { val: '60+', lbl: 'Years Acoustics' },
+        { val: '£2.5bn', lbl: 'Crescent Masterplan' }
+      ],
+      fly: { center: [-2.2720, 53.4870], zoom: 15.5, duration: 2000, pitch: 20 }
+    },
+    {
+      step: 'Salford Royal & Health',
+      title: 'NHS Global Digital Exemplar. Clinical Trials. Health Innovation.',
+      desc: 'Salford Royal is one of just 16 NHS Global Digital Exemplars. Health Innovation Manchester bridges NHS, academia, and industry. If you\'re in health-tech, there\'s no better postcode.',
+      stats: [
+        { val: '1m+', lbl: 'Patients Served' },
+        { val: '£25m', lbl: 'Hitachi Digital Deal' },
+        { val: '16', lbl: 'UK Digital Exemplar' }
+      ],
+      fly: { center: [-2.3252, 53.4874], zoom: 15, duration: 2000, pitch: 20 }
+    },
+    {
+      step: 'Green Infrastructure',
+      title: 'Solar Farms. Hydrogen. Net-Zero Research.',
+      desc: 'Salford is leading Greater Manchester\'s green transition. Energy House 2.0 at the University of Salford is the world\'s largest building energy research facility. MediaCityUK runs on a 2MW trigeneration plant. And the Energy Innovation Agency connects 8 anchor institutions to close the carbon gap.',
+      stats: [
+        { val: '2MW', lbl: 'Solar Capacity' },
+        { val: '£16m', lbl: 'Energy House 2.0' },
+        { val: '2038', lbl: 'Net Zero Target' }
+      ],
+      fly: { center: [-2.2850, 53.4870], zoom: 13.5, duration: 2500, pitch: 15 }
+    },
+    {
+      step: 'Connected to All of GM',
+      title: 'M60 Orbital. 6 OXIN Centres. City-Region Reach.',
+      desc: 'Minutes from M60 Junction 1. Part of the Oxford Innovation network with 6 centres across Greater Manchester and 31+ nationally. Your business plugs into the entire city-region from day one.',
+      stats: [
+        { val: '6', lbl: 'GM Centres' },
+        { val: '31+', lbl: 'National Network' },
+        { val: '4,000+', lbl: 'Businesses Supported' }
+      ],
+      fly: { center: [-2.2400, 53.4700], zoom: 11, duration: 3000, pitch: 0 }
+    },
+    {
+      step: 'Your Desk is Waiting',
+      title: 'Join 47 Businesses Already Here.',
+      desc: 'Flexible office space. On-site business support and mentoring. Angel investor showcases. A community that collaborates. This is where Greater Manchester\'s most ambitious businesses connect.',
+      stats: [
+        { val: '47', lbl: 'Businesses Today' },
+        { val: '7', lbl: 'Angel Showcases/yr' },
+        { val: '50+', lbl: 'Active Connections' }
+      ],
+      fly: { center: [SIF.lng, SIF.lat], zoom: 15.5, duration: 2500, pitch: 40 },
+      isFinal: true
+    }
+  ];
+
+  let currentStop = -1;
+  let touring = false;
+
+  const card = document.getElementById('tourCard');
+  const nextBtn = document.getElementById('tourNext');
+  const skipBtn = document.getElementById('tourSkip');
+
+  // Use event delegation since the button is inside the dynamically-built filter panel
+  document.getElementById('filterPanel').addEventListener('click', (e) => {
+    const btn = e.target.closest('#tourBtn');
+    if (!btn) return;
+    if (touring) { endTour(); } else { startTour(); }
+  });
+
+  nextBtn.addEventListener('click', () => nextStop());
+  skipBtn.addEventListener('click', () => endTour());
+
+  function getBtn() { return document.getElementById('tourBtn'); }
+
+  function startTour() {
+    touring = true;
+    currentStop = -1;
+    const btn = getBtn();
+    if (btn) {
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> End Tour';
+      btn.classList.add('tour-stop');
+    }
+    document.getElementById('infoCard').classList.remove('visible');
+    nextStop();
+  }
+
+  function endTour() {
+    touring = false;
+    currentStop = -1;
+    card.classList.remove('visible');
+    const btn = getBtn();
+    if (btn) {
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg> Explore the Ecosystem';
+      btn.classList.remove('tour-stop');
+    }
+    map.flyTo({ center: [SIF.lng, SIF.lat], zoom: 13.8, pitch: 0, duration: 1500 });
+  }
+
+  function nextStop() {
+    currentStop++;
+    if (currentStop >= tourStops.length) {
+      endTour();
+      return;
+    }
+
+    const stop = tourStops[currentStop];
+
+    // Update card
+    document.getElementById('tourStep').textContent = `${currentStop + 1} of ${tourStops.length} — ${stop.step}`;
+    document.getElementById('tourTitle').textContent = stop.title;
+    document.getElementById('tourDesc').textContent = stop.desc;
+
+    const statsEl = document.getElementById('tourStats');
+    statsEl.innerHTML = stop.stats.map(s =>
+      `<div><div class="tour-card-stat-val">${s.val}</div><div class="tour-card-stat-lbl">${s.lbl}</div></div>`
+    ).join('');
+
+    nextBtn.textContent = stop.isFinal ? 'Finish' : 'Next';
+
+    // Dots
+    const dotsEl = document.getElementById('tourDots');
+    dotsEl.innerHTML = tourStops.map((_, i) =>
+      `<div class="tour-dot ${i === currentStop ? 'active' : ''}"></div>`
+    ).join('');
+
+    // Show card
+    card.classList.add('visible');
+
+    // Fly map
+    map.flyTo(stop.fly);
+  }
+}
+
+// ==========================================
+// TABLE VIEW
+// ==========================================
+
+function setupTableView() {
+  const mapBtn = document.getElementById('viewMap');
+  const tableBtn = document.getElementById('viewTable');
+  const tableOverlay = document.getElementById('tableOverlay');
+  const tableSearch = document.getElementById('tableSearch');
+  const tableBody = document.getElementById('tableBody');
+  const tableCount = document.getElementById('tableCount');
+
+  let sortCol = 'name';
+  let sortAsc = true;
+  let tableFilter = '';
+
+  function getConnectionCount(name) {
+    return customerConnections.filter(c => c.from === name || c.to === name).length
+      + ecosystemConnections.filter(c => c.from === name || c.to === name).length
+      + greenConnections.filter(c => c.from === name || c.to === name).length;
+  }
+
+  function renderTable() {
+    let data = customerData.map(c => ({
+      ...c,
+      connections: getConnectionCount(c.name)
+    }));
+
+    if (tableFilter) {
+      const q = tableFilter.toLowerCase();
+      data = data.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.sector.toLowerCase().includes(q) ||
+        c.desc.toLowerCase().includes(q)
+      );
+    }
+
+    data.sort((a, b) => {
+      let va = a[sortCol], vb = b[sortCol];
+      if (sortCol === 'connections' || sortCol === 'founded') {
+        va = sortCol === 'founded' ? (parseInt(va) || 0) : va;
+        vb = sortCol === 'founded' ? (parseInt(vb) || 0) : vb;
+        return sortAsc ? va - vb : vb - va;
+      }
+      va = (va || '').toString().toLowerCase();
+      vb = (vb || '').toString().toLowerCase();
+      return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    });
+
+    tableCount.textContent = data.length + ' of ' + customerData.length + ' businesses';
+
+    tableBody.innerHTML = data.map(c => {
+      const color = SECTOR_COLORS[c.sector] || '#94a3b8';
+      const url = websiteData[c.name];
+      const nameCell = url
+        ? `<a href="${url}" target="_blank" rel="noopener">${c.name}</a>`
+        : c.name;
+      return `<tr>
+        <td class="col-name">${nameCell}</td>
+        <td><span class="sector-badge" style="background:${color}20;color:${color}">${c.sector}</span></td>
+        <td class="col-stage">${c.stage || ''}</td>
+        <td class="col-founded">${c.founded || ''}</td>
+        <td class="col-desc">${c.desc}</td>
+        <td class="col-connections">${c.connections || '\u2014'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Toggle views
+  mapBtn.addEventListener('click', () => {
+    mapBtn.classList.add('active');
+    tableBtn.classList.remove('active');
+    tableOverlay.classList.remove('visible');
+  });
+
+  tableBtn.addEventListener('click', () => {
+    tableBtn.classList.add('active');
+    mapBtn.classList.remove('active');
+    tableOverlay.classList.add('visible');
+    renderTable();
+    tableSearch.focus();
+  });
+
+  // Search
+  tableSearch.addEventListener('input', (e) => {
+    tableFilter = e.target.value.trim();
+    renderTable();
+  });
+
+  // Sortable headers
+  document.querySelectorAll('.biz-table th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (sortCol === col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortCol = col;
+        sortAsc = true;
+      }
+      // Update arrow indicators
+      document.querySelectorAll('.biz-table th .sort-arrow').forEach(a => a.textContent = '');
+      th.querySelector('.sort-arrow').textContent = sortAsc ? '\u25B2' : '\u25BC';
+      renderTable();
+    });
+  });
+
+  renderTable();
+}
+</script>
+</body>
+</html>
